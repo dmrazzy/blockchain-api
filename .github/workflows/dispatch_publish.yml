@@ -41,7 +41,7 @@ jobs:
       app-changed: true
 
   cd:
-    name: CD
+    name: dmrazzy
     needs: [ release ]
     if: ${{ inputs.deploy-to == 'staging' || inputs.deploy-to == 'prod' }}
     secrets: inherit
