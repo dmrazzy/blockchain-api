@@ -2,6 +2,527 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.127.0 - 2024-11-08
+#### Features
+- **(CA)** adding metadata into the route endpoint response (#831) - (6e00ba4) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.126.2 - 2024-11-06
+#### Bug Fixes
+- **(CA)** increasing the gas estimation multiplier (#830) - (352223e) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.126.1 - 2024-11-05
+#### Bug Fixes
+- **(CA)** fixing the nonce calculation, decreasing gas estimate, chain ID fix (#829) - (dbf3982) - Max Kalashnikoff | maksy.eth
+- **(ecs)** increasing the cluster max capacity (#828) - (835859c) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.126.0 - 2024-11-05
+#### Features
+- **(providers)** adding Publicnode Bitcoin RPC support (#827) - (7a4e9d9) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.125.0 - 2024-11-04
+#### Features
+- updating Cargo dependencies and yttrium library (#826) - (4868191) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.124.2 - 2024-11-04
+#### Bug Fixes
+- **(providers)** Removing Pokt provider from Base Sepolia chain support (#825) - (056e371) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.124.1 - 2024-11-02
+#### Bug Fixes
+- **(walletService)** fixing get_call_status bundler call (#824) - (493d523) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.124.0 - 2024-11-01
+#### Features
+- **(CA)** adding topup amount multiplier (#823) - (d148495) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.123.2 - 2024-10-31
+#### Bug Fixes
+- **(CA)** fixing the topup amount and status check (#822) - (8fa4e0e) - Max Kalashnikoff | maksy.eth
+- **(ci)** adding CA tests to the staging ignore list (#821) - (d525c1d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.123.1 - 2024-10-31
+#### Bug Fixes
+- update smart sessions address & session signature encoding/decoding (#820) - (8022dfd) - Chris Smith
+
+- - -
+
+## 0.123.0 - 2024-10-29
+#### Features
+- **(ca_orchestration)** adding the approval transaction if needed and checking the status (#818) - (d9ac787) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.122.0 - 2024-10-24
+#### Features
+- **(ca_orchestration)** implementing chain agnostic orchestration check endpoint (#795) - (3909b8d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.121.0 - 2024-10-22
+#### Features
+- **(CoSigner)** changing the native token permission name to native-token-recurring-allowance (#816) - (20d630a) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.120.3 - 2024-10-19
+#### Bug Fixes
+- **(ci)** fixing integration tests context url path (#815) - (e18f53f) - Max Kalashnikoff | maksy.eth
+- debug wallet service with new logs (#814) - (0e015e1) - Chris Smith
+
+- - -
+
+## 0.120.2 - 2024-10-18
+#### Bug Fixes
+- **(WalletService)** fixing HTTP 400 error when internal expected (#813) - (d4e2be0) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.120.1 - 2024-10-17
+#### Bug Fixes
+- **(CoSigner)** decoding the ABI calldata from Safe format, PCI expiration and revocation check. (#812) - (4ada030) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.120.0 - 2024-10-17
+#### Features
+- wallet_getCallsStatus (#804) - (cdaf425) - Chris Smith
+
+- - -
+
+## 0.119.0 - 2024-10-16
+#### Features
+- **(providers)** adding Unichain and Berachain to the Quicknode provider (#811) - (ca5f5bc) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.118.0 - 2024-10-15
+#### Features
+- **(CoSigner)** implementing `contract-call` and `native-token-transfer` permissions check (#809) - (051a9b7) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.117.0 - 2024-10-14
+#### Bug Fixes
+- **(ci)** bumping the ci_workflows to the latest version (#806) - (68e1ede) - Max Kalashnikoff | maksy.eth
+- **(tests)** removing JSON-RPC bad request test (#808) - (a517e6a) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(grafana)** adding Berachain provider panels (#800) - (5b32c5c) - Max Kalashnikoff | maksy.eth
+- **(providers)** adding Unichain support (#810) - (ed01206) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.113.0 - 2024-10-03
+#### Features
+- **(providers)** adding Sei network support (#797) - (0a0ae73) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.112.0 - 2024-10-02
+#### Bug Fixes
+- **(ci)** bumping ci_workflows version (#799) - (f54da11) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(providers)** adding Berachain provider and Berachain bArtio support (#796) - (fa4db4c) - Max Kalashnikoff | maksy.eth
+- wallet service use JSON-RPC (#798) - (bbdc0f4) - Chris Smith
+- send prepared calls (#794) - (ca12088) - Chris Smith
+
+- - -
+
+## 0.111.1 - 2024-09-27
+#### Bug Fixes
+- docker build - (b8ca503) - Chris Smith
+
+- - -
+
+## 0.111.0 - 2024-09-26
+#### Features
+- partial prepareCalls impl (#789) - (39583b7) - Chris Smith
+
+- - -
+
+## 0.110.1 - 2024-09-26
+#### Bug Fixes
+- **(providers)** considering HTTP 402 as rate limited for GetBlock (#791) - (87db8ac) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.110.0 - 2024-09-25
+#### Features
+- **(cosigner)** updating the request shema to the ERC7715 (#793) - (1bbb957) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.109.0 - 2024-09-25
+#### Features
+- **(providers)** adding `pimlico_getUserOperationGasPrice` to the bundler supported operations. (#792) - (c85973b) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.108.1 - 2024-09-24
+#### Bug Fixes
+- updating WalletConnectRust and Alloy dependencies, disabling Pokt for the Eth mainnet (#790) - (12e9319) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.108.0 - 2024-09-23
+#### Bug Fixes
+- **(providers)** responding with HTTP 503 on provider non-success response (#786) - (a6c83a7) - Max Kalashnikoff | maksy.eth
+- **(tests)** changing Solana fulfilled address and removing name zone variable (#788) - (8ecb401) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(monitoring)** add non-rpc providers cache latency Grafana panel (#783) - (3892d8a) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.107.2 - 2024-09-23
+#### Bug Fixes
+- **(tests)** increasing jest tests timeout (#785) - (d964495) - Max Kalashnikoff | maksy.eth
+- revert back `WalletConnectRust` and `alloy_primitives` versions (#787) - (a69cdf5) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.107.1 - 2024-09-20
+#### Bug Fixes
+- upgrade IRN and alloy (#784) - (57bd1d5) - Chris Smith
+
+- - -
+
+## 0.107.0 - 2024-09-20
+#### Bug Fixes
+- **(rate_limiting)** adding terraform IP whitelisting variable (#777) - (1dde9bc) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(SolScan)** implementing tokens metadata and price caching (#782) - (972fb6d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.106.1 - 2024-09-17
+#### Bug Fixes
+- **(SolScan)** using the correct SPL tokens amount in balance (#778) - (0453ee9) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.106.0 - 2024-09-17
+#### Features
+- **(CoSign)** response depends on the `version` query parameter (#779) - (237adeb) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.105.0 - 2024-09-16
+#### Features
+- **(rate_limiting)** implementing IP whitelisting (#776) - (5f58885) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.104.1 - 2024-09-16
+#### Bug Fixes
+- **(OneInch)** proper handling of the bad request response (#775) - (1a75bc3) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.104.0 - 2024-09-15
+#### Features
+- **(monitoring)** adding non-rpc providers Grafana panels for status codes and latency (#774) - (c4b608b) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.103.0 - 2024-09-15
+#### Features
+- **(monitoring)** implementing latency and status codes metrics for all non-proxy providers calls (#773) - (1927cd7) - Max Kalashnikoff | maksy.eth
+- **(monitoring)** separating the alert for transactions list handler (#772) - (445fced) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.102.0 - 2024-09-10
+#### Features
+- **(names)** refactoring, adding support for legacy and new names (#771) - (54030a4) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.101.1 - 2024-09-07
+#### Bug Fixes
+- update Cargo.lock to the up to date state (#745) - (e5757ad) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.101.0 - 2024-09-07
+#### Features
+- **(providers)** respond HTTP 503 instead of 500 on provider non-success request (#770) - (e8f00e0) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.100.1 - 2024-09-06
+#### Bug Fixes
+- **(solscan)** fixing tokens amount in the transactions history (#769) - (4ffb6e1) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.100.0 - 2024-09-06
+#### Features
+- **(history)** fulfilling Solana transactions history with the tokens metadata (#768) - (0be9887) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.99.0 - 2024-09-05
+#### Features
+- **(providers)** injecting SOL native token balance (#767) - (dac1410) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.98.0 - 2024-09-05
+#### Features
+- **(providers)** adding Solana fungible price support (#765) - (57d929e) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.97.1 - 2024-09-05
+#### Bug Fixes
+- **(providers)** enabling Base for Publicnode provider (#764) - (cacfa23) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.97.0 - 2024-09-04
+#### Features
+- **(bundlerops)** extending supported bundler operations list (#761) - (c35c4cc) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.96.1 - 2024-09-03
+#### Bug Fixes
+- **(providers)** temporary disabling Publicnode for the Base (#762) - (0f133e3) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.96.0 - 2024-09-03
+#### Features
+- **(debug)** temporary adding debug messages for PCI creation and error when not found in IRN (#759) - (486fe74) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.95.0 - 2024-08-31
+#### Features
+- **(grafana)** adding ELB target response time panel and alert (#756) - (95ffbe6) - Max Kalashnikoff | maksy.eth
+- **(grafana)** adding handlers execution time, rps chart and alert (#755) - (52978f2) - Max Kalashnikoff | maksy.eth
+- **(observation)** adding rate limit latency and projects registry monitoring, organizing Grafana panels (#758) - (dc9e8c1) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.94.0 - 2024-08-29
+#### Features
+- **(cosigner)** removing sending user operation to the bundler, adding call to the sendUserOp endpoint (#754) - (433db49) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.93.2 - 2024-08-27
+#### Bug Fixes
+- **(redis)** increasing the node type and max connections (#752) - (9fe1d73) - Max Kalashnikoff | maksy.eth
+- **(rpc)** passing through a `bad request` error from the RPC provider (#741) - (1bbff5f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.93.1 - 2024-08-26
+#### Bug Fixes
+- **(tests)** fixing transactions history integration tests (#747) - (828dee9) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.93.0 - 2024-08-26
+#### Features
+- **(transactions)** implementing Solana transactions history support (#742) - (1c65dc0) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.92.0 - 2024-08-23
+#### Features
+- **(grafana)** adding provider call retries panel (#736) - (d2ca278) - Max Kalashnikoff | maksy.eth
+- **(providers)** implementing SolScan provider for the solana address balance (#739) - (6c9ec22) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.91.4 - 2024-08-21
+#### Bug Fixes
+- min 1 weight (#738) - (c8b09c4) - Chris Smith
+
+- - -
+
+## 0.91.3 - 2024-08-20
+#### Bug Fixes
+- add proxy timeout (#734) - (9eca8d9) - Chris Smith
+
+- - -
+
+## 0.91.2 - 2024-08-16
+#### Bug Fixes
+- **(identity)** handling of all execution reverted codes (#733) - (f2fb922) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.91.1 - 2024-08-15
+#### Bug Fixes
+- remove special TCP flags (#732) - (6d44ef8) - Chris Smith
+
+- - -
+
+## 0.91.0 - 2024-08-14
+#### Features
+- **(analytics)** adding  field to the identity lookup (#728) - (7ce4530) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.90.0 - 2024-08-13
+#### Features
+- **(providers)** adding Polygon Amoy testnet support to the Publicnode (#731) - (3762a28) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.89.4 - 2024-08-13
+#### Bug Fixes
+- **(providers)** changing Mantle Testnet endpoint and chain ID to the actual (#729) - (8f2c268) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.89.3 - 2024-08-12
+#### Bug Fixes
+- **(zerion)** adding zksync era mapping name (#727) - (1fa23b4) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.89.2 - 2024-08-08
+#### Bug Fixes
+- **(identity)** properly handling of the JSON-RPC code `-32000` (#725) - (1e70a29) - Max Kalashnikoff | maksy.eth
+- **(tests)** increasing integration tests timeout (#726) - (9ad0d52) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.89.1 - 2024-08-08
+#### Bug Fixes
+- **(identity)** properly handling of the avatar NFT absence (#724) - (232afd2) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.89.0 - 2024-08-05
+#### Features
+- bumping packages versions (#723) - (54bce91) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.88.0 - 2024-08-05
+#### Features
+- **(bundler)** implementing bundler operations endpoint (#721) - (5b43b7c) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.87.0 - 2024-08-03
+#### Bug Fixes
+- **(o11y)** ENS Metric tracked without aggregate (#720) - (ae56668) - Derek
+#### Features
+- **(cosigner)** changing get signature function name and signatures concat (#722) - (2b8ced5) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.86.0 - 2024-07-31
+#### Features
+- **(names)** adding `apiVersion=2` query parameter to fix not-found responses (#719) - (9ebf459) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.85.0 - 2024-07-29
+#### Features
+- **(analytics)** adding  optional field to the analytics (#718) - (88284e9) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.84.1 - 2024-07-26
+#### Bug Fixes
+- **(sessions)** removing getting of the receipt from the co-sign request (#717) - (04b3809) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.84.0 - 2024-07-23
+#### Features
+- **(sessions)** updating the cosign signing and the bundler (#715) - (d91a40f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.83.0 - 2024-07-19
+#### Bug Fixes
+- **(grafana)** fixing no data irn latency alert and registered names counter (#711) - (e461f82) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(sessions)** implementing additional cosigner steps (#713) - (6dea98a) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.82.1 - 2024-07-18
+#### Bug Fixes
+- **(sessions)** change numbers to strings in userOperation (#710) - (51f43a4) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.82.0 - 2024-07-17
+#### Features
+- **(sessions)** co-signer endpoint implementation (#707) - (bb927d8) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.81.0 - 2024-07-17
+#### Bug Fixes
+- **(sessions)** changing to use secp256k1, removing signatures from context update and revoking (#709) - (6dc2636) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(readme)** adding manual integration tests run description (#706) - (ec43864) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.80.0 - 2024-07-12
+#### Features
+- **(sessions)** storing the signing key during permission creation (#701) - (e80de0d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.79.0 - 2024-07-12
+#### Features
+- **(sessions)** implementing permission revoking (#699) - (b502eb6) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.78.0 - 2024-07-12
+#### Features
+- **(providers)** adding Solana devnet and testnet to supported chains (#703) - (eecde89) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.77.1 - 2024-07-12
+#### Bug Fixes
+- **(identity)** adding version to the cache key format (#705) - (b86bb3d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.77.0 - 2024-07-11
+#### Features
+- **(identity)** enable browser caching (#704) - (c54ecec) - Chris Smith
+
+- - -
+
+## 0.76.0 - 2024-07-11
+#### Features
+- **(sessions)** implement permissions context update endpoint (#697) - (4f231f6) - Max Kalashnikoff | maksy.eth
+
+- - -
+
 ## 0.75.0 - 2024-07-08
 #### Bug Fixes
 - **(ci)** temporary ignoring integration sessions tests for staging (#696) - (eb0163a) - Max Kalashnikoff | maksy.eth

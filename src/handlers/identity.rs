@@ -14,6 +14,7 @@ use {
         response::{IntoResponse, Response},
         Json,
     },
+    chrono::{DateTime, TimeDelta, Utc},
     core::fmt,
     ethers::{
         abi::Address,
@@ -21,7 +22,7 @@ use {
         types::H160,
         utils::to_checksum,
     },
-    hyper::{body::to_bytes, HeaderMap, StatusCode},
+    hyper::{body::to_bytes, header::CACHE_CONTROL, HeaderMap, StatusCode},
     serde::{de::DeserializeOwned, Deserialize, Serialize},
     std::{
         net::SocketAddr,
@@ -33,15 +34,28 @@ use {
     wc::future::FutureExt,
 };
 
+const CACHE_TTL: u64 = 60 * 60 * 24;
+const CACHE_TTL_DELTA: TimeDelta = TimeDelta::seconds(CACHE_TTL as i64);
+const CACHE_TTL_STD: Duration = Duration::from_secs(CACHE_TTL);
+
 const SELF_PROVIDER_ERROR_PREFIX: &str = "SelfProviderError: ";
 const EMPTY_RPC_RESPONSE: &str = "0x";
 pub const ETHEREUM_MAINNET: &str = "eip155:1";
+
+/// Error codes that reflect an `execution reverted` and should proceed with Ok() during
+/// the identity avatar lookup because of an absence of the ERC-721 contract address or
+/// token ID in the ENS avatar record.
+const JSON_RPC_OK_ERROR_CODES: [&str; 3] = ["-32000", "-32015", "3"];
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentityResponse {
     name: Option<String>,
     avatar: Option<String>,
+    // Preferred saving the resolved_at time instead of relying on Redis cache TTL because
+    // getting the current TTL requires a second command & round trip to Redis
+    // Optional to support DB migration, can switch to required in the future
+    resolved_at: Option<DateTime<Utc>>,
 }
 
 pub async fn handler(
@@ -110,6 +124,11 @@ async fn handler_internal(
             .map(|geo| (geo.country, geo.continent, geo.region))
             .unwrap_or((None, None, None));
 
+        let same_sender = query
+            .sender
+            .as_ref()
+            .map(|sender| sender == &address.to_string());
+
         state.analytics.identity_lookup(IdentityLookupInfo::new(
             &query.0,
             address,
@@ -121,10 +140,25 @@ async fn handler_internal(
             region,
             country,
             continent,
+            query.client_id.clone(),
+            same_sender,
         ));
     }
 
-    Ok(Json(res).into_response())
+    let now = Utc::now();
+    let ttl_secs = res.resolved_at
+        .map(|resolved_at| ttl_from_resolved_at(resolved_at, now))
+        // Only happens during initial rollout when `resolved_at` is None, so we don't need to go overboard on the cache
+        .unwrap_or(TimeDelta::hours(1))
+        .num_seconds();
+    let cache_control = format!("public, max-age={ttl_secs}, s-maxage={ttl_secs}");
+
+    Ok(([(CACHE_CONTROL, cache_control)], Json(res)).into_response())
+}
+
+fn ttl_from_resolved_at(resolved_at: DateTime<Utc>, now: DateTime<Utc>) -> TimeDelta {
+    let expires = resolved_at + CACHE_TTL_DELTA;
+    (expires - now).max(TimeDelta::zero())
 }
 
 #[derive(Serialize, Clone)]
@@ -154,6 +188,10 @@ pub struct IdentityQueryParams {
     /// Optional flag to control the cache to fetch the data from the provider
     /// or serve from the cache where applicable
     pub use_cache: Option<bool>,
+    /// Client ID for analytics
+    pub client_id: Option<String>,
+    /// Request sender address for analytics
+    pub sender: Option<String>,
 }
 
 #[tracing::instrument(skip_all, level = "debug")]
@@ -165,6 +203,7 @@ async fn lookup_identity(
     headers: HeaderMap,
 ) -> Result<(IdentityLookupSource, IdentityResponse), RpcError> {
     let address_with_checksum = to_checksum(&address, None);
+    let cache_record_key = format!("{}-v1", address_with_checksum);
 
     // Check if we should enable cache control for allow listed Project ID
     // The cache is enabled by default
@@ -191,7 +230,7 @@ async fn lookup_identity(
         if let Some(cache) = &state.identity_cache {
             debug!("Checking cache for identity");
             let cache_start = SystemTime::now();
-            let value = cache.get(&address_with_checksum).await?;
+            let value = cache.get(&cache_record_key).await?;
             state.metrics.add_identity_lookup_cache_latency(cache_start);
             if let Some(response) = value {
                 return Ok((IdentityLookupSource::Cache, response));
@@ -239,19 +278,20 @@ async fn lookup_identity(
             debug!("Saving to cache");
             let cache = cache.clone();
             let res = res.clone();
-            let cache_ttl = Duration::from_secs(60 * 60 * 24);
             // Do not block on cache write.
             tokio::spawn(async move {
+                let cache_start = SystemTime::now();
                 cache
-                    .set(&address_with_checksum, &res, Some(cache_ttl))
+                    .set(&cache_record_key, &res, Some(CACHE_TTL_STD))
                     .await
                     .tap_err(|err| {
                         warn!(
-                            "failed to cache identity lookup (cache_key:{address_with_checksum}): \
+                            "failed to cache identity lookup (cache_key:{cache_record_key}): \
                              {err:?}"
                         )
                     })
                     .ok();
+                state.metrics.add_identity_lookup_cache_latency(cache_start);
                 debug!("Setting cache success");
             });
         }
@@ -313,7 +353,11 @@ async fn lookup_identity_rpc(
         None
     };
 
-    Ok(IdentityResponse { name, avatar })
+    Ok(IdentityResponse {
+        name,
+        avatar,
+        resolved_at: Some(Utc::now()),
+    })
 }
 
 #[tracing::instrument(level = "debug")]
@@ -321,12 +365,32 @@ pub fn handle_rpc_error(error: ProviderError) -> Result<(), RpcError> {
     match error {
         ProviderError::CustomError(e) if e.starts_with(SELF_PROVIDER_ERROR_PREFIX) => {
             let error_detail = e.trim_start_matches(SELF_PROVIDER_ERROR_PREFIX);
-            // Exceptions for the detailed HTTP error return on RPC call
+            // Exception for no available JSON-RPC providers
             if error_detail.contains("503 Service Unavailable") {
-                Err(RpcError::ProviderError)
-            } else {
-                Err(RpcError::IdentityLookup(error_detail.to_string()))
+                return Err(RpcError::ProviderError);
             }
+            // Proceed with Ok() if the error is related to the contract call error
+            // since there should be a wrong NFT avatar contract address.
+            if error_detail.contains("Contract call error") {
+                debug!(
+                    "Contract call error while looking up identity: {:?}",
+                    error_detail
+                );
+                return Ok(());
+            }
+            // Check the list of error codes that reflects an execution reverted
+            // and should proceed with Ok()
+            for &code in &JSON_RPC_OK_ERROR_CODES {
+                if error_detail.contains(&format!("code: {},", code)) {
+                    debug!(
+                        "JsonRpcError code {} while looking up identity: {:?}",
+                        code, error_detail
+                    );
+                    return Ok(());
+                }
+            }
+
+            Err(RpcError::IdentityLookup(error_detail.to_string()))
         }
         ProviderError::CustomError(e) => {
             debug!("Custom error while looking up identity: {:?}", e);
@@ -387,14 +451,6 @@ impl fmt::Debug for SelfProvider {
     }
 }
 
-#[derive(Serialize)]
-struct JsonRpcRequest<T: Serialize + Send + Sync> {
-    id: String,
-    jsonrpc: String,
-    method: String,
-    params: T,
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum SelfProviderError {
     #[error("RpcError: {0:?}")]
@@ -414,6 +470,9 @@ pub enum SelfProviderError {
 
     #[error("Generic parameter error: {0}")]
     GenericParameterError(String),
+
+    #[error("Contract call error: {0}")]
+    ContractCallError(String),
 }
 
 impl ethers::providers::RpcError for SelfProviderError {
@@ -450,18 +509,17 @@ impl JsonRpcClient for SelfProvider {
         let id = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time should't go backwards")
-            .as_millis()
-            .to_string();
+            .as_secs();
 
         let response = rpc_call(
             self.state.clone(),
             self.connect_info,
             self.query.clone(),
             self.headers.clone(),
-            serde_json::to_vec(&JsonRpcRequest {
-                id,
-                jsonrpc: "2.0".to_string(),
-                method: method.to_owned(),
+            serde_json::to_vec(&crypto::JsonRpcRequest {
+                id: id.into(),
+                jsonrpc: crypto::JSON_RPC_VERSION.clone(),
+                method: method.to_owned().into(),
                 params,
             })
             .expect("Should be able to serialize a JsonRpcRequest")
@@ -488,22 +546,63 @@ impl JsonRpcClient for SelfProvider {
             JsonRpcResponse::Error(e) => return Err(SelfProviderError::JsonRpcError(e)),
             JsonRpcResponse::Result(r) => {
                 // We shouldn't process with `0x` result because this leads to the ethers-rs
-                // panic when looking for an avatar
+                // panic when looking for an avatar. This is a workaround for the ethers-rs
+                // when avatar pointing to the wrong ERC-721 contract address.
                 if r.result == EMPTY_RPC_RESPONSE {
-                    return Err(SelfProviderError::ProviderError {
-                        status: StatusCode::METHOD_NOT_ALLOWED,
-                        body: format!("JSON-RPC result is {}", EMPTY_RPC_RESPONSE),
-                    });
+                    return Err(SelfProviderError::ContractCallError(
+                        "Empty response from the contract call".into(),
+                    ));
                 } else {
                     r.result
                 }
             }
         };
-        let result = serde_json::from_value(result).map_err(|_| {
-            SelfProviderError::GenericParameterError(
-                "Caller always provides generic parameter R=Bytes".into(),
-            )
+        let result = serde_json::from_value(result).map_err(|e| {
+            SelfProviderError::GenericParameterError(format!(
+                "Caller should always provide generic parameter R=Bytes: {}",
+                e
+            ))
         })?;
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn full_ttl_when_resolved_now() {
+        let now = Utc::now();
+        assert_eq!(ttl_from_resolved_at(now, now), CACHE_TTL_DELTA);
+    }
+
+    #[test]
+    fn expires_now() {
+        let now = Utc::now();
+        assert_eq!(
+            ttl_from_resolved_at(now - CACHE_TTL_DELTA, now),
+            TimeDelta::zero()
+        );
+    }
+
+    #[test]
+    fn expires_past() {
+        let now = Utc::now();
+        assert_eq!(
+            ttl_from_resolved_at(now - CACHE_TTL_DELTA - TimeDelta::days(1), now),
+            TimeDelta::zero()
+        );
+    }
+
+    #[test]
+    fn deserialize_identity_response_with_no_resolved_at() {
+        serde_json::from_value::<IdentityResponse>(json!({
+            "name": "name",
+            "avatar": "avatar"
+        }))
+        .unwrap();
     }
 }

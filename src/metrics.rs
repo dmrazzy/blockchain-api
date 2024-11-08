@@ -3,8 +3,8 @@ use {
         database::helpers::get_account_names_stats,
         handlers::identity::IdentityLookupSource,
         providers::{ProviderKind, RpcProvider},
+        storage::irn::OperationType,
     },
-    hyper::http,
     sqlx::PgPool,
     std::time::{Duration, SystemTime},
     sysinfo::{
@@ -51,6 +51,9 @@ pub struct Metrics {
     pub history_lookup_success_counter: Counter<u64>,
     pub history_lookup_latency_tracker: Histogram<f64>,
 
+    // Generic Non-RPC providers caching
+    pub non_rpc_providers_cache_latency_tracker: Histogram<f64>,
+
     // System metrics
     pub cpu_usage: Histogram<f64>,
     pub memory_total: Histogram<f64>,
@@ -58,6 +61,8 @@ pub struct Metrics {
 
     // Rate limiting
     pub rate_limited_entries_counter: Histogram<u64>,
+    pub rate_limiting_latency_tracker: Histogram<f64>,
+    pub rate_limited_responses_counter: Counter<u64>,
 
     // Account names
     pub account_names_count: ObservableGauge<u64>,
@@ -241,6 +246,20 @@ impl Metrics {
             .with_description("The latency of IRN client calls")
             .init();
 
+        let rate_limiting_latency_tracker = meter
+            .f64_histogram("rate_limiting_latency_tracker")
+            .with_description("Rate limiting latency tracker")
+            .init();
+
+        let rate_limited_responses_counter = meter
+            .u64_counter("rate_limited_responses_counter")
+            .with_description("Rate limiting responses counter")
+            .init();
+        let non_rpc_providers_cache_latency_tracker = meter
+            .f64_histogram("non_rpc_providers_cache_latency_tracker")
+            .with_description("The latency of non-RPC providers cache lookups")
+            .init();
+
         Metrics {
             rpc_call_counter,
             rpc_call_retries,
@@ -270,12 +289,15 @@ impl Metrics {
             history_lookup_counter,
             history_lookup_success_counter,
             history_lookup_latency_tracker,
+            non_rpc_providers_cache_latency_tracker,
             cpu_usage,
             memory_total,
             memory_used,
-            rate_limited_entries_counter,
             account_names_count,
             irn_latency_tracker,
+            rate_limiting_latency_tracker,
+            rate_limited_entries_counter,
+            rate_limited_responses_counter,
         }
     }
 }
@@ -319,11 +341,24 @@ impl Metrics {
         )
     }
 
-    pub fn add_external_http_latency(&self, provider_kind: ProviderKind, latency: f64) {
+    pub fn add_external_http_latency(
+        &self,
+        provider_kind: ProviderKind,
+        start: SystemTime,
+        endpoint: Option<String>,
+    ) {
+        let mut attributes = vec![otel::KeyValue::new("provider", provider_kind.to_string())];
+        if let Some(endpoint) = endpoint {
+            attributes.push(otel::KeyValue::new("endpoint", endpoint));
+        }
+
         self.http_external_latency_tracker.record(
             &otel::Context::new(),
-            latency,
-            &[otel::KeyValue::new("provider", provider_kind.to_string())],
+            start
+                .elapsed()
+                .unwrap_or(Duration::from_secs(0))
+                .as_secs_f64(),
+            &attributes,
         )
     }
 
@@ -374,19 +409,36 @@ impl Metrics {
 
     pub fn add_status_code_for_provider(
         &self,
-        provider: &dyn RpcProvider,
-        status: http::StatusCode,
-        chain_id: String,
+        provider_kind: ProviderKind,
+        status: u16,
+        chain_id: Option<String>,
+        endpoint: Option<String>,
     ) {
-        self.provider_status_code_counter.add(
-            &otel::Context::new(),
-            1,
-            &[
-                otel::KeyValue::new("provider", provider.provider_kind().to_string()),
-                otel::KeyValue::new("status_code", format!("{}", status.as_u16())),
-                otel::KeyValue::new("chain_id", chain_id),
-            ],
-        )
+        let mut attributes = vec![
+            otel::KeyValue::new("provider", provider_kind.to_string()),
+            otel::KeyValue::new("status_code", format!("{}", status)),
+        ];
+        if let Some(chain_id) = chain_id {
+            attributes.push(otel::KeyValue::new("chain_id", chain_id));
+        }
+        if let Some(endpoint) = endpoint {
+            attributes.push(otel::KeyValue::new("endpoint", endpoint));
+        }
+
+        self.provider_status_code_counter
+            .add(&otel::Context::new(), 1, &attributes)
+    }
+
+    pub fn add_latency_and_status_code_for_provider(
+        &self,
+        provider_kind: ProviderKind,
+        status: u16,
+        latency: SystemTime,
+        chain_id: Option<String>,
+        endpoint: Option<String>,
+    ) {
+        self.add_status_code_for_provider(provider_kind, status, chain_id, endpoint.clone());
+        self.add_external_http_latency(provider_kind, latency, endpoint);
     }
 
     pub fn record_provider_weight(&self, provider: &ProviderKind, chain_id: String, weight: u64) {
@@ -537,14 +589,41 @@ impl Metrics {
             .record(&otel::Context::new(), entry, &[]);
     }
 
-    pub fn add_irn_latency(&self, start: SystemTime, operation: String) {
+    pub fn add_rate_limiting_latency(&self, start: SystemTime) {
+        self.rate_limiting_latency_tracker.record(
+            &otel::Context::new(),
+            start
+                .elapsed()
+                .unwrap_or(Duration::from_secs(0))
+                .as_secs_f64(),
+            &[],
+        );
+    }
+
+    pub fn add_non_rpc_providers_cache_latency(&self, start: SystemTime) {
+        self.non_rpc_providers_cache_latency_tracker.record(
+            &otel::Context::new(),
+            start
+                .elapsed()
+                .unwrap_or(Duration::from_secs(0))
+                .as_secs_f64(),
+            &[],
+        );
+    }
+
+    pub fn add_rate_limited_response(&self) {
+        self.rate_limited_responses_counter
+            .add(&otel::Context::new(), 1, &[]);
+    }
+
+    pub fn add_irn_latency(&self, start: SystemTime, operation: OperationType) {
         self.irn_latency_tracker.record(
             &otel::Context::new(),
             start
                 .elapsed()
                 .unwrap_or(Duration::from_secs(0))
                 .as_secs_f64(),
-            &[otel::KeyValue::new("operation", operation)],
+            &[otel::KeyValue::new("operation", operation.as_str())],
         );
     }
 

@@ -51,7 +51,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Base mainnet
         (
             "eip155:8453".into(),
-            ("base".into(), Weight::new(Priority::Normal).unwrap()),
+            ("base".into(), Weight::new(Priority::High).unwrap()),
         ),
         // Binance Smart Chain mainnet
         (
@@ -84,10 +84,49 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:137".into(),
             ("polygon-bor".into(), Weight::new(Priority::Normal).unwrap()),
         ),
+        // Polygon bor amoy testnet
+        (
+            "eip155:80002".into(),
+            (
+                "polygon-amoy-bor-rpc".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
         // Mantle mainnet
         (
             "eip155:5000".into(),
             ("mantle-rpc".into(), Weight::new(Priority::High).unwrap()),
+        ),
+        // Sei mainnet
+        (
+            "eip155:1329".into(),
+            ("sei-evm-rpc".into(), Weight::new(Priority::Normal).unwrap()),
+        ),
+        // Scroll
+        (
+            "eip155:534352".into(),
+            ("scroll-rpc".into(), Weight::new(Priority::Normal).unwrap()),
+        ),
+        // Scroll sepolia testnet
+        (
+            "eip155:534351".into(),
+            (
+                "scroll-sepolia-rpc".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        // Bitcoin mainnet
+        (
+            "bip122:000000000019d6689c085ae165831e93".into(),
+            ("bitcoin-rpc".into(), Weight::new(Priority::Normal).unwrap()),
+        ),
+        // Bitcoin testnet
+        (
+            "bip122:000000000933ea01ad0ee984209779ba".into(),
+            (
+                "bitcoin-testnet-rpc".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
         ),
     ])
 }

@@ -57,18 +57,18 @@ dashboard.new(
 
 .addPanels(layout.generate_grid([
   row.new('Application'),
-    // panels.app.http_request_rate(ds, vars)          { gridPos: pos._4 },
-    // panels.app.http_request_latency(ds, vars)       { gridPos: pos._4 },
     panels.ecs.availability(ds, vars)                { gridPos: pos._4 },
     panels.lb.error_5xx(ds, vars)                    { gridPos: pos._4 },
     panels.proxy.errors_non_provider(ds, vars)       { gridPos: pos._4 },
     panels.lb.error_5xx_logs(ds, vars)               { gridPos: pos._4 },
+    panels.app.handlers_latency(ds, vars)            { gridPos: pos._2 },
+    panels.app.handlers_rate(ds, vars)               { gridPos: pos._2 },
 
   row.new('ECS'),
     panels.ecs.memory(ds, vars)                      { gridPos: pos._3 },
     panels.ecs.cpu(ds, vars)                         { gridPos: pos._3 },
 
-  row.new('Chain Usage'),
+  row.new('RPC Proxy Chain Usage'),
     panels.usage.provider(ds, vars, 'Aurora')        { gridPos: pos._4 },
     panels.usage.provider(ds, vars, 'Base')          { gridPos: pos._4 },
     panels.usage.provider(ds, vars, 'Binance')       { gridPos: pos._4 },
@@ -81,8 +81,10 @@ dashboard.new(
     panels.usage.provider(ds, vars, 'zkSync')        { gridPos: pos._4 },
     panels.usage.provider(ds, vars, 'Mantle')        { gridPos: pos._4 },
     panels.usage.provider(ds, vars, 'GetBlock')      { gridPos: pos._4 },
+    panels.usage.provider(ds, vars, 'Berachain')     { gridPos: pos._4 },
+    panels.usage.provider(ds, vars, 'Unichain')      { gridPos: pos._4 },
 
-  row.new('Provider Weights'),
+  row.new('RPC Proxy provider Weights'),
     panels.weights.provider(ds, vars, 'Aurora')      { gridPos: pos._4 },
     panels.weights.provider(ds, vars, 'Base')        { gridPos: pos._4 },
     panels.weights.provider(ds, vars, 'Binance')     { gridPos: pos._4 },
@@ -95,8 +97,10 @@ dashboard.new(
     panels.weights.provider(ds, vars, 'zkSync')      { gridPos: pos._4 },
     panels.weights.provider(ds, vars, 'Mantle')      { gridPos: pos._4 },
     panels.weights.provider(ds, vars, 'GetBlock')    { gridPos: pos._4 },
+    panels.weights.provider(ds, vars, 'Berachain')   { gridPos: pos._4 },
+    panels.weights.provider(ds, vars, 'Unichain')    { gridPos: pos._4 },
 
-  row.new('Status Codes'),
+  row.new('RPC Proxy providers Status Codes'),
     panels.status.provider(ds, vars, 'Aurora')       { gridPos: pos._4 },
     panels.status.provider(ds, vars, 'Base')         { gridPos: pos._4 },
     panels.status.provider(ds, vars, 'Binance')      { gridPos: pos._4 },
@@ -109,15 +113,41 @@ dashboard.new(
     panels.status.provider(ds, vars, 'zkSync')       { gridPos: pos._4 },
     panels.status.provider(ds, vars, 'Mantle')       { gridPos: pos._4 },
     panels.status.provider(ds, vars, 'GetBlock')     { gridPos: pos._4 },
+    panels.status.provider(ds, vars, 'Berachain')    { gridPos: pos._4 },
+    panels.status.provider(ds, vars, 'Unichain')     { gridPos: pos._4 },
 
-  row.new('Proxy Metrics'),
+  row.new('RPC Proxy Metrics'),
     panels.proxy.calls(ds, vars)                     { gridPos: pos._2 },
     panels.proxy.latency(ds, vars)                   { gridPos: pos._2 },
     panels.proxy.errors_provider(ds, vars)           { gridPos: pos._3 },
-    panels.proxy.rejected_projects(ds, vars)         { gridPos: pos._3 },
-    panels.proxy.quota_limited_projects(ds, vars)    { gridPos: pos._3 },
-    panels.proxy.rate_limited_counter(ds, vars)      { gridPos: pos._3 },
+    panels.proxy.provider_retries(ds, vars)          { gridPos: pos._3 },
     panels.proxy.http_codes(ds, vars)                { gridPos: pos._3 },
+
+  row.new('Non-RPC providers Status Codes'),
+    panels.status.provider(ds, vars, 'Zerion')       { gridPos: pos._4 },
+    panels.status.provider(ds, vars, 'SolScan')      { gridPos: pos._4 },
+    panels.status.provider(ds, vars, 'OneInch')      { gridPos: pos._4 },
+    panels.status.provider(ds, vars, 'Coinbase')     { gridPos: pos._4 },
+  
+  row.new('Non-RPC providers Latency'),
+    panels.non_rpc.endpoints_latency(ds, vars, 'Zerion')       { gridPos: pos._4 },
+    panels.non_rpc.endpoints_latency(ds, vars, 'SolScan')      { gridPos: pos._4 },
+    panels.non_rpc.endpoints_latency(ds, vars, 'OneInch')      { gridPos: pos._4 },
+    panels.non_rpc.endpoints_latency(ds, vars, 'Coinbase')     { gridPos: pos._4 },
+
+  row.new('Non-RPC providers Cache'),
+    panels.non_rpc.cache_latency(ds, vars)      { gridPos: pos._2 },
+
+  row.new('Projects registry'),
+    panels.projects.rejected_projects(ds, vars)         { gridPos: pos._4 },
+    panels.projects.quota_limited_projects(ds, vars)    { gridPos: pos._4 },
+    panels.projects.cache_latency(ds, vars)             { gridPos: pos._4 },
+    panels.projects.fetch_latency(ds, vars)             { gridPos: pos._4 },
+
+  row.new('Rate limiting'),
+    panels.rate_limiting.counter(ds, vars)      { gridPos: pos._3 },
+    panels.rate_limiting.latency(ds, vars)      { gridPos: pos._3 },
+    panels.rate_limiting.rate_limited(ds, vars) { gridPos: pos._3 },
 
   row.new('History Metrics'),
     panels.history.requests(ds, vars)               { gridPos: pos_short._3 },
@@ -144,6 +174,7 @@ dashboard.new(
 
     panels.lb.healthy_hosts(ds, vars)             { gridPos: pos._3 },
     panels.lb.error_4xx(ds, vars)                 { gridPos: pos._3 },
+    panels.lb.response_time(ds, vars)             { gridPos: pos._3 },
 
   row.new('IRN Client'),
     panels.irn.latency(ds, vars)        { gridPos: pos._2 },

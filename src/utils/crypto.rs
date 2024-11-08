@@ -1,18 +1,34 @@
 use {
-    crate::analytics::MessageSource,
-    alloy_primitives::Address,
+    crate::{analytics::MessageSource, error::RpcError},
+    alloy::{
+        network::Ethereum,
+        primitives::{Address, U256 as AlloyU256},
+        providers::{Provider as AlloyProvider, ReqwestProvider},
+        rpc::json_rpc::Id,
+        sol,
+        sol_types::SolCall,
+    },
+    base64::prelude::*,
+    bs58,
     ethers::{
-        prelude::abigen,
+        abi::Token,
+        core::{
+            k256::ecdsa::{signature::Verifier, Signature, VerifyingKey},
+            types::Signature as EthSignature,
+        },
+        prelude::{abigen, EthAbiCodec, EthAbiType},
         providers::{Http, Middleware, Provider},
-        types::{H160, H256, U256},
+        types::{Address as EthersAddress, Bytes, H160, H256, U128, U256},
+        utils::keccak256,
     },
     once_cell::sync::Lazy,
     regex::Regex,
     relay_rpc::auth::cacao::{signature::eip6492::verify_eip6492, CacaoError},
+    serde::{Deserialize, Serialize},
     std::{str::FromStr, sync::Arc},
     strum::IntoEnumIterator,
     strum_macros::{Display, EnumIter, EnumString},
-    tracing::warn,
+    tracing::{error, warn},
     url::Url,
 };
 
@@ -20,9 +36,20 @@ const ENSIP11_MAINNET_COIN_TYPE: u32 = 60;
 static CAIP_CHAIN_ID_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"[-a-zA-Z0-9]{1,32}").expect("Failed to initialize regexp for the chain ID format")
 });
-static CAIP_ADDRESS_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"[-a-zA-Z0-9]{1,63}").expect("Failed to initialize regexp for the address format")
+static CAIP_ETH_ADDRESS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"0x[a-fA-F0-9]{40}")
+        .expect("Failed to initialize regexp for the eth address format")
 });
+static CAIP_SOLANA_ADDRESS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"[1-9A-HJ-NP-Za-km-z]{32,44}")
+        .expect("Failed to initialize regexp for the solana address format")
+});
+
+pub const SOLANA_NATIVE_TOKEN_ADDRESS: &str = "So11111111111111111111111111111111111111111";
+
+pub const JSON_RPC_VERSION_STR: &str = "2.0";
+pub static JSON_RPC_VERSION: once_cell::sync::Lazy<Arc<str>> =
+    once_cell::sync::Lazy::new(|| Arc::from(JSON_RPC_VERSION_STR));
 
 #[derive(thiserror::Error, Debug)]
 pub enum CryptoUitlsError {
@@ -48,15 +75,246 @@ pub enum CryptoUitlsError {
     AddressChecksum(String),
     #[error("Failed to parse RPC url: {0}")]
     RpcUrlParseError(String),
+    #[error("HTTP request failed: {0}")]
+    HttpRequest(#[from] reqwest::Error),
+    #[error("No result JSON-RPC call response")]
+    NoResultInRpcResponse,
+    #[error("Error in JSON-RPC call to the Bundler: {0}")]
+    BundlerRpcResponseError(String),
+    #[error("Error when decoding ERC20 call: {0}")]
+    Erc20DecodeError(String),
 }
 
-pub fn add_eip191(message: &str) -> String {
-    format!("\x19Ethereum Signed Message:\n{}{}", message.len(), message)
+/// JSON-RPC request schema
+#[derive(Serialize, Clone, Debug)]
+pub struct JsonRpcRequest<T: Serialize + Send + Sync> {
+    pub id: Id,
+    pub jsonrpc: Arc<str>,
+    pub method: Arc<str>,
+    pub params: T,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct BundlerJsonRpcParams {
+    user_op: UserOperation,
+    entry_point: String,
+}
+
+/// ERC-4337 bundler userOperation schema v0.7
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserOperation {
+    pub sender: EthersAddress,
+    /// The first 192 bits are the nonce key, the last 64 bits are the nonce value
+    pub nonce: U256,
+    pub call_data: Bytes,
+    pub call_gas_limit: U128,
+    pub verification_gas_limit: U128,
+    pub pre_verification_gas: U256,
+    pub max_priority_fee_per_gas: U128,
+    pub max_fee_per_gas: U128,
+    pub signature: Bytes,
+    /*
+     * Optional fields
+     */
+    /// Factory and data, are populated if deploying a new sender contract
+    pub factory: Option<EthersAddress>,
+    pub factory_data: Option<Bytes>,
+    /// Paymaster and related fields are populated if using a paymaster
+    pub paymaster: Option<EthersAddress>,
+    pub paymaster_verification_gas_limit: Option<U128>,
+    pub paymaster_post_op_gas_limit: Option<U128>,
+    pub paymaster_data: Option<Bytes>,
+}
+
+impl UserOperation {
+    /// Create a packed UserOperation v07 structure
+    pub fn get_packed(&self) -> PackedUserOperation {
+        let init_code = match (self.factory, self.factory_data.as_ref()) {
+            (Some(factory), Some(factory_data)) => {
+                let mut init_code = factory.as_bytes().to_vec();
+                init_code.extend_from_slice(factory_data);
+                Bytes::from(init_code)
+            }
+            _ => Bytes::new(),
+        };
+
+        let account_gas_limits = concat_128(
+            self.verification_gas_limit.low_u128().to_be_bytes(),
+            self.call_gas_limit.low_u128().to_be_bytes(),
+        );
+
+        let gas_fees = concat_128(
+            self.max_priority_fee_per_gas.low_u128().to_be_bytes(),
+            self.max_fee_per_gas.low_u128().to_be_bytes(),
+        );
+
+        let paymaster_and_data = match (
+            self.paymaster,
+            self.paymaster_verification_gas_limit,
+            self.paymaster_post_op_gas_limit,
+            self.paymaster_data.as_ref(),
+        ) {
+            (
+                Some(paymaster),
+                Some(paymaster_verification_gas_limit),
+                Some(paymaster_post_op_gas_limit),
+                Some(paymaster_data),
+            ) => {
+                let mut paymaster_and_data = paymaster.as_bytes().to_vec();
+                paymaster_and_data
+                    .extend_from_slice(&paymaster_verification_gas_limit.low_u128().to_be_bytes());
+                paymaster_and_data
+                    .extend_from_slice(&paymaster_post_op_gas_limit.low_u128().to_be_bytes());
+                paymaster_and_data.extend_from_slice(paymaster_data);
+                Bytes::from(paymaster_and_data)
+            }
+            _ => Bytes::new(),
+        };
+
+        PackedUserOperation {
+            sender: self.sender,
+            nonce: self.nonce,
+            init_code,
+            call_data: self.call_data.clone(),
+            account_gas_limits: H256::from_slice(&account_gas_limits),
+            pre_verification_gas: self.pre_verification_gas,
+            gas_fees: H256::from_slice(&gas_fees),
+            paymaster_and_data,
+            signature: self.signature.clone(),
+        }
+    }
+}
+
+/// ERC-4337 bundler Packed userOperation schema for v07
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, EthAbiCodec, EthAbiType)]
+#[serde(rename_all = "camelCase")]
+pub struct PackedUserOperation {
+    pub sender: EthersAddress,
+    pub nonce: U256,
+    pub init_code: Bytes,
+    pub call_data: Bytes,
+    pub account_gas_limits: H256,
+    pub pre_verification_gas: U256,
+    pub gas_fees: H256,
+    pub paymaster_and_data: Bytes,
+    pub signature: Bytes,
+}
+
+fn concat_128(a: [u8; 16], b: [u8; 16]) -> [u8; 32] {
+    std::array::from_fn(|i| {
+        if let Some(i) = i.checked_sub(a.len()) {
+            b[i]
+        } else {
+            a[i]
+        }
+    })
+}
+
+// ERC20 contract
+sol! {
+    function balanceOf(address _owner) external view returns (uint256);
+    function transfer(address to, uint256 value) external returns (bool);
+    function approve(address _spender, uint256 _value) external returns (bool);
+    function transferFrom(address _from, address _to, uint256 _value) external returns (bool);
+    function allowance(address _owner, address _spender) external view returns (uint256);
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Erc20FunctionType {
+    BalanceOf,
+    Transfer,
+    Approve,
+    TransferFrom,
+    Allowance,
+}
+
+/// Decodes ERC20 contract call function data and returns the function name.
+pub fn decode_erc20_function_type(
+    function_data: &[u8],
+) -> Result<Erc20FunctionType, CryptoUitlsError> {
+    // Get the 4 bytes function selector
+    let selector: [u8; 4] = function_data[0..4].try_into().map_err(|_| {
+        CryptoUitlsError::Erc20DecodeError("Function data is less then 4 bytes.".into())
+    })?;
+
+    let function_type = match selector {
+        balanceOfCall::SELECTOR => Erc20FunctionType::BalanceOf,
+        transferCall::SELECTOR => Erc20FunctionType::Transfer,
+        approveCall::SELECTOR => Erc20FunctionType::Approve,
+        transferFromCall::SELECTOR => Erc20FunctionType::TransferFrom,
+        allowanceCall::SELECTOR => Erc20FunctionType::Allowance,
+        _ => {
+            return Err(CryptoUitlsError::Erc20DecodeError(
+                "Unknown function selector.".into(),
+            ))
+        }
+    };
+
+    Ok(function_type)
+}
+
+/// Decode ERC20 contract transfer data and returns to and amount
+pub fn decode_erc20_transfer_data(data: &[u8]) -> Result<(Address, AlloyU256), CryptoUitlsError> {
+    // Ensure the function data is at least 4 bytes for the selector
+    if data.len() < 4 {
+        return Err(CryptoUitlsError::Erc20DecodeError(
+            "ERC20 function data is less than 4 bytes.".into(),
+        ));
+    }
+
+    // Get the 4-byte function selector and check it
+    let selector = &data[0..4];
+    if selector != transferCall::SELECTOR {
+        return Err(CryptoUitlsError::Erc20DecodeError(
+            "ERC20 function data is not a transfer function.".into(),
+        ));
+    }
+    let transfer_params = transferCall::abi_decode(data, false).map_err(|err| {
+        CryptoUitlsError::Erc20DecodeError(format!(
+            "Failed to decode ERC20 transfer params: {}",
+            err
+        ))
+    })?;
+    Ok((transfer_params.to, transfer_params.value))
+}
+
+/// Convert message to EIP-191 compatible format
+pub fn to_eip191_message(message: &[u8]) -> Vec<u8> {
+    let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
+    let mut eip191_message = Vec::with_capacity(prefix.len() + message.len());
+    eip191_message.extend_from_slice(prefix.as_bytes());
+    eip191_message.extend_from_slice(message);
+    eip191_message
+}
+
+/// Pack signature into a single byte array to Ethereum compatible format
+pub fn pack_signature(unpacked: &EthSignature) -> Bytes {
+    // Extract r, s, and v from the signature
+    let r = unpacked.r;
+    let s = unpacked.s;
+    let v = if unpacked.v == 27 { 0x1b } else { 0x1c };
+    let mut r_bytes = [0u8; 32];
+    let mut s_bytes = [0u8; 32];
+    r.to_big_endian(&mut r_bytes);
+    s.to_big_endian(&mut s_bytes);
+    // Pack r, s, and v into a single byte array
+    let mut packed_signature = Vec::with_capacity(r_bytes.len() + s_bytes.len() + 1);
+    packed_signature.extend_from_slice(&r_bytes);
+    packed_signature.extend_from_slice(&s_bytes);
+    packed_signature.push(v);
+    Bytes::from(packed_signature)
+}
+
+/// Encode two bytes array into a single ABI encoded bytes
+pub fn abi_encode_two_bytes_arrays(bytes1: &Bytes, bytes2: &Bytes) -> Bytes {
+    let data = vec![Token::Bytes(bytes1.to_vec()), Token::Bytes(bytes2.to_vec())];
+    Bytes::from(ethers::abi::encode(&[Token::Array(data)]))
 }
 
 /// Returns the keccak256 EIP-191 hash of the message
 pub fn get_message_hash(message: &str) -> H256 {
-    let prefixed_message = add_eip191(message);
+    let prefixed_message = to_eip191_message(message.as_bytes());
     let message_hash = ethers::core::utils::keccak256(prefixed_message.clone());
     ethers::types::H256::from_slice(&message_hash)
 }
@@ -80,6 +338,25 @@ pub async fn verify_message_signature(
     .await
 }
 
+/// Construct RPC calls url
+fn get_rpc_url(
+    chain_id: &str,
+    rpc_project_id: &str,
+    source: MessageSource,
+) -> Result<Url, CryptoUitlsError> {
+    let mut provider = Url::parse("https://rpc.walletconnect.com/v1").map_err(|e| {
+        CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {}", e))
+    })?;
+    provider.query_pairs_mut().append_pair("chainId", chain_id);
+    provider
+        .query_pairs_mut()
+        .append_pair("projectId", rpc_project_id);
+    provider
+        .query_pairs_mut()
+        .append_pair("source", &source.to_string());
+    Ok(provider)
+}
+
 /// Veryfy message signature for eip6492 contract
 #[tracing::instrument(level = "debug")]
 pub async fn verify_eip6492_message_signature(
@@ -94,23 +371,7 @@ pub async fn verify_eip6492_message_signature(
     let address = Address::parse_checksummed(address, None)
         .map_err(|_| CryptoUitlsError::AddressChecksum(address.into()))?;
 
-    let mut provider = Url::parse("https://rpc.walletconnect.com/v1")
-        .map_err(|e| {
-            CryptoUitlsError::RpcUrlParseError(format!(
-                "Failed to parse RPC url:
-        {}",
-                e
-            ))
-        })
-        .unwrap();
-    provider.query_pairs_mut().append_pair("chainId", chain_id);
-    provider
-        .query_pairs_mut()
-        .append_pair("projectId", rpc_project_id);
-    provider
-        .query_pairs_mut()
-        .append_pair("source", &source.to_string());
-
+    let provider = get_rpc_url(chain_id, rpc_project_id, source)?;
     let hexed_signature = hex::decode(&signature[2..])
         .map_err(|e| CryptoUitlsError::SignatureFormat(format!("Wrong signature format: {}", e)))?;
 
@@ -122,6 +383,36 @@ pub async fn verify_eip6492_message_signature(
             e
         ))),
     }
+}
+
+/// Verify secp256k1 message signature using the verification key
+/// Verification key is expected to be in DER format and Base64 encoded same as signature
+#[tracing::instrument(level = "debug")]
+pub fn verify_secp256k1_signature(
+    message: &str,
+    signature: &str,
+    verification_key: &str,
+) -> Result<(), RpcError> {
+    let verifying_key = VerifyingKey::from_sec1_bytes(
+        &BASE64_STANDARD
+            .decode(verification_key)
+            .map_err(|e| RpcError::WrongBase64Format(e.to_string()))?,
+    )
+    .map_err(|e| RpcError::KeyFormatError(e.to_string()))?;
+
+    let signature_bytes = &BASE64_STANDARD
+        .decode(signature)
+        .map_err(|e| RpcError::WrongBase64Format(e.to_string()))?;
+    let signature = Signature::from_der(signature_bytes)
+        .map_err(|e| RpcError::SignatureFormatError(e.to_string()))?;
+
+    let message_hash = keccak256(message.as_bytes());
+
+    verifying_key
+        .verify(&message_hash, &signature)
+        .map_err(|e| RpcError::SignatureValidationError(e.to_string()))?;
+
+    Ok(())
 }
 
 /// Get the balance of the ERC20 token
@@ -146,7 +437,7 @@ pub async fn get_erc20_balance(
 
 /// Get the balance of ERC20 token by calling the contract address
 #[tracing::instrument(level = "debug")]
-async fn get_erc20_contract_balance(
+pub async fn get_erc20_contract_balance(
     chain_id: &str,
     contract: H160,
     wallet: H160,
@@ -160,11 +451,11 @@ async fn get_erc20_contract_balance(
         ]"#,
     );
 
-    let provider = Provider::<Http>::try_from(format!(
-        "https://rpc.walletconnect.com/v1?chainId={}&projectId={}&source={}",
-        chain_id, rpc_project_id, source
-    ))
-    .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {}", e)))?;
+    let provider =
+        Provider::<Http>::try_from(get_rpc_url(chain_id, rpc_project_id, source)?.as_str())
+            .map_err(|e| {
+                CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {}", e))
+            })?;
     let provider = Arc::new(provider);
 
     let contract = ERC20Contract::new(contract, provider);
@@ -179,17 +470,17 @@ async fn get_erc20_contract_balance(
 
 /// Get the balance of the native coin
 #[tracing::instrument(level = "debug")]
-async fn get_balance(
+pub async fn get_balance(
     chain_id: &str,
     wallet: H160,
     rpc_project_id: &str,
     source: MessageSource,
 ) -> Result<U256, CryptoUitlsError> {
-    let provider = Provider::<Http>::try_from(format!(
-        "https://rpc.walletconnect.com/v1?chainId={}&projectId={}&source={}",
-        chain_id, rpc_project_id, source
-    ))
-    .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {}", e)))?;
+    let provider =
+        Provider::<Http>::try_from(get_rpc_url(chain_id, rpc_project_id, source)?.as_str())
+            .map_err(|e| {
+                CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {}", e))
+            })?;
     let provider = Arc::new(provider);
 
     let balance = provider
@@ -197,6 +488,90 @@ async fn get_balance(
         .await
         .map_err(|e| CryptoUitlsError::ProviderError(format!("{}", e)))?;
     Ok(balance)
+}
+
+/// Get the gas price
+#[tracing::instrument(level = "debug")]
+pub async fn get_gas_price(
+    chain_id: &str,
+    rpc_project_id: &str,
+    source: MessageSource,
+) -> Result<u128, CryptoUitlsError> {
+    let provider =
+        ReqwestProvider::<Ethereum>::new_http(get_rpc_url(chain_id, rpc_project_id, source)?);
+    let gas_price = provider
+        .get_gas_price()
+        .await
+        .map_err(|e| CryptoUitlsError::ProviderError(format!("{}", e)))?;
+    Ok(gas_price)
+}
+
+/// Get the nonce
+#[tracing::instrument(level = "debug")]
+pub async fn get_nonce(
+    chain_id: &str,
+    wallet: Address,
+    rpc_project_id: &str,
+    source: MessageSource,
+) -> Result<u64, CryptoUitlsError> {
+    let provider =
+        ReqwestProvider::<Ethereum>::new_http(get_rpc_url(chain_id, rpc_project_id, source)?);
+    let nonce = provider
+        .get_transaction_count(wallet)
+        .await
+        .map_err(|e| CryptoUitlsError::ProviderError(format!("{}", e)))?;
+    Ok(nonce)
+}
+
+/// Call entry point v07 getUserOpHash contract and get the userOperation hash
+#[tracing::instrument(level = "debug")]
+pub async fn call_get_user_op_hash(
+    rpc_project_id: &str,
+    chain_id: &str,
+    contract_address: H160,
+    user_operation: UserOperation,
+) -> Result<[u8; 32], CryptoUitlsError> {
+    abigen!(
+        EntryPoint,
+        r#"[
+            struct v07UserOperation { address sender; uint256 nonce; bytes initCode; bytes callData; bytes32 accountGasLimits; uint256 preVerificationGas; bytes32 gasFees; bytes paymasterAndData; bytes signature}
+            function getUserOpHash(v07UserOperation calldata userOp) public view returns (bytes32)
+        ]"#,
+    );
+
+    let provider = Provider::<Http>::try_from(
+        get_rpc_url(chain_id, rpc_project_id, MessageSource::ChainAgnosticCheck)?.as_str(),
+    )
+    .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {}", e)))?;
+    let provider = Arc::new(provider);
+
+    let contract = EntryPoint::new(contract_address, provider);
+
+    let packed_user_op = user_operation.get_packed();
+    let user_op = v07UserOperation {
+        sender: packed_user_op.sender,
+        nonce: packed_user_op.nonce,
+        init_code: packed_user_op.init_code,
+        call_data: packed_user_op.call_data,
+        account_gas_limits: packed_user_op.account_gas_limits.into(),
+        pre_verification_gas: packed_user_op.pre_verification_gas,
+        gas_fees: packed_user_op.gas_fees.into(),
+        paymaster_and_data: packed_user_op.paymaster_and_data,
+        signature: packed_user_op.signature,
+    };
+
+    let hash = contract
+        .get_user_op_hash(user_op)
+        .call()
+        .await
+        .map_err(|e| {
+            CryptoUitlsError::ContractCallError(format!(
+                "Failed to call getUserOpHash in EntryPoint contract: {}",
+                e
+            ))
+        })?;
+
+    Ok(hash)
 }
 
 /// Convert EVM chain ID to coin type ENSIP-11
@@ -228,6 +603,27 @@ pub fn is_coin_type_supported(coin_type: u32) -> bool {
     ChainId::iter().any(|x| x as u64 == evm_chain_id as u64)
 }
 
+/// Check if the address is in correct format
+pub fn is_address_valid(address: &str, namespace: &CaipNamespaces) -> bool {
+    match namespace {
+        CaipNamespaces::Eip155 => {
+            if !CAIP_ETH_ADDRESS_REGEX.is_match(address) {
+                return false;
+            }
+            H160::from_str(address).is_ok()
+        }
+        CaipNamespaces::Solana => {
+            if !CAIP_SOLANA_ADDRESS_REGEX.is_match(address) {
+                return false;
+            }
+            match bs58::decode(address).into_vec() {
+                Ok(decoded) => decoded.len() == 32,
+                Err(_) => false,
+            }
+        }
+    }
+}
+
 /// Human readable chain ids to CAIP-2 chain ids
 #[derive(Clone, Copy, Debug, EnumString, EnumIter, Display)]
 #[strum(serialize_all = "lowercase")]
@@ -237,6 +633,8 @@ pub enum ChainId {
     Aurora = 1313161554,
     Avalanche = 43114,
     Base = 8453,
+    #[strum(serialize = "base_sepolia_testnet", serialize = "base-sepolia-testnet")]
+    BaseSepoliaTestnet = 84532,
     #[strum(
         to_string = "binance-smart-chain",
         serialize = "binance_smart_chain",
@@ -262,8 +660,12 @@ pub enum ChainId {
         serialize = "gnosischain"
     )]
     GnosisChain = 100,
-    #[strum(serialize = "zksync", serialize = "zksyncera")]
-    ZkSyncEra = 328,
+    #[strum(
+        serialize = "zksync",
+        serialize = "zksyncera",
+        serialize = "zksync-era"
+    )]
+    ZkSyncEra = 324,
     Zora = 7854577,
 }
 
@@ -305,12 +707,19 @@ impl ChainId {
             }
         }
     }
+
+    /// Is ChainID is supported
+    pub fn is_supported(chain_id: u64) -> bool {
+        ChainId::iter().any(|x| x as u64 == chain_id)
+    }
 }
 
-#[derive(Clone, Copy, Debug, EnumString, EnumIter, Display, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, EnumString, EnumIter, Display, Eq, PartialEq, Deserialize, Hash)]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum CaipNamespaces {
     Eip155,
+    Solana,
 }
 
 pub fn format_to_caip10(namespace: CaipNamespaces, chain_id: &str, address: &str) -> String {
@@ -360,9 +769,10 @@ pub fn disassemble_caip10(
         .ok_or(CryptoUitlsError::WrongChainIdFormat(chain_id.clone()))?;
 
     let address = parts[2].to_string();
-    CAIP_ADDRESS_REGEX
-        .captures(&address)
-        .ok_or(CryptoUitlsError::WrongAddressFormat(address.clone()))?;
+    if !is_address_valid(&address, &namespace) {
+        return Err(CryptoUitlsError::WrongAddressFormat(address.clone()));
+    };
+
     Ok((namespace, chain_id, address))
 }
 
@@ -409,9 +819,23 @@ pub fn convert_token_amount_to_value(balance: U256, price: f64, decimals: u32) -
     balance_f64 * price
 }
 
+/// Convert Alloy Address type to Ethers H160
+pub fn convert_alloy_address_to_h160(addr: Address) -> H160 {
+    let bytes = addr.as_ref();
+    H160::from_slice(bytes)
+}
+
 #[cfg(test)]
 mod tests {
-    use {super::*, std::collections::HashMap};
+    use {
+        super::*,
+        ethers::{
+            core::k256::ecdsa::{signature::Signer, Signature, SigningKey, VerifyingKey},
+            utils::keccak256,
+        },
+        rand_core::OsRng,
+        std::collections::HashMap,
+    };
 
     #[test]
     fn test_convert_coin_type_to_evm_chain_id() {
@@ -448,6 +872,7 @@ mod tests {
         chains.insert("xdai", "eip155:100");
         chains.insert("polygon", "eip155:137");
         chains.insert("base", "eip155:8453");
+        chains.insert("base_sepolia_testnet", "eip155:84532");
 
         for (chain_name, coin_type) in chains.iter() {
             let result = ChainId::to_caip2(chain_name);
@@ -466,6 +891,7 @@ mod tests {
         chains.insert("eip155:100", "xdai");
         chains.insert("eip155:137", "polygon");
         chains.insert("eip155:8453", "base");
+        chains.insert("eip155:84532", "base-sepolia-testnet");
 
         for (chain_id, chain_name) in chains.iter() {
             let result = ChainId::from_caip2(chain_id);
@@ -504,11 +930,14 @@ mod tests {
 
     #[test]
     fn test_disassemble_caip10() {
-        let caip10 = "eip155:1:0xtest";
+        let caip10 = "eip155:1:0x1234567890123456789012345678901234567890";
         let result = disassemble_caip10(caip10).unwrap();
         assert_eq!(result.0, CaipNamespaces::Eip155);
         assert_eq!(result.1, "1".to_string());
-        assert_eq!(result.2, "0xtest".to_string());
+        assert_eq!(
+            result.2,
+            "0x1234567890123456789012345678901234567890".to_string()
+        );
 
         let malformed_caip10 = "eip15510xtest";
         let error_result = disassemble_caip10(malformed_caip10);
@@ -539,6 +968,128 @@ mod tests {
         assert_eq!(
             convert_token_amount_to_value(balance, price, decimals),
             0.959_694_527_317_077_7 * price
+        );
+    }
+
+    #[test]
+    fn test_verify_secp256k1_signature() {
+        let message = "test message";
+
+        // Generate secp256k1 key pair
+        let signing_key = SigningKey::random(&mut OsRng);
+        let verifying_key = VerifyingKey::from(&signing_key);
+        let public_key_der = verifying_key.to_encoded_point(false).as_bytes().to_vec();
+        let public_key_der_base64 = BASE64_STANDARD.encode(public_key_der);
+
+        // Hash the message using Keccak-256
+        let message_hash = keccak256(message.as_bytes());
+
+        // Sign the hashed message
+        let signature: Signature = signing_key.sign(&message_hash);
+        let signature_base64 = BASE64_STANDARD.encode(signature.to_der().as_bytes());
+
+        // Correct signature and message
+        assert!(
+            verify_secp256k1_signature(message, &signature_base64, &public_key_der_base64).is_ok()
+        );
+
+        // Incorrect message
+        assert!(verify_secp256k1_signature(
+            "wrong message signature",
+            &signature_base64,
+            &public_key_der_base64
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_is_address_valid() {
+        let valid_eth_address = "0x1234567890123456789012345678901234567890";
+        let valid_sol_address = "CKfatsPMUf8SkiURsDXs7eK6GWb4Jsd6UDbs7twMCWxo";
+        let invalid_address = "67890123456789012340123456";
+
+        assert!(is_address_valid(valid_eth_address, &CaipNamespaces::Eip155));
+        assert!(!is_address_valid(invalid_address, &CaipNamespaces::Eip155));
+
+        assert!(is_address_valid(valid_sol_address, &CaipNamespaces::Solana));
+        assert!(!is_address_valid(invalid_address, &CaipNamespaces::Solana));
+    }
+
+    #[test]
+    fn test_decode_erc20_function_type() {
+        // Test for ERC20 transfer function data.
+        let transfer_function_data_hex = "a9059cbb0000000000000000000000005aeda56215b167893e80b4fe645ba6d5bab767de000000000000000000000000000000000000000000000000000000000000000a";
+        let transfer_function_data = hex::decode(transfer_function_data_hex).unwrap();
+        let transfer_function_type = decode_erc20_function_type(&transfer_function_data).unwrap();
+        assert_eq!(transfer_function_type, Erc20FunctionType::Transfer);
+
+        // Test for ERC20 balanceOf function data.
+        let balance_of_function_data_hex =
+            "70a082310000000000000000000000005aeda56215b167893e80b4fe645ba6d5bab767de";
+        let balance_of_function_data = hex::decode(balance_of_function_data_hex).unwrap();
+        let balance_of_function_type =
+            decode_erc20_function_type(&balance_of_function_data).unwrap();
+        assert_eq!(balance_of_function_type, Erc20FunctionType::BalanceOf);
+    }
+
+    #[test]
+    fn test_decode_erc20_transfer_data() {
+        let address = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+        let amount = "10000000";
+
+        let transfer_function_encoded = transferCall {
+            to: Address::from_str(address).unwrap(),
+            value: AlloyU256::from_str(amount).unwrap(),
+        };
+        let encoded = transfer_function_encoded.abi_encode();
+
+        let (to, amount_decoded) = decode_erc20_transfer_data(&encoded).unwrap();
+
+        assert_eq!(to, Address::from_str(address).unwrap());
+        assert_eq!(amount_decoded, AlloyU256::from_str(amount).unwrap());
+    }
+
+    // Ignoring this test until the RPC project ID is provided by the CI workflow
+    // The test can be run manually by providing the project ID
+    #[ignore]
+    #[tokio::test]
+    async fn test_call_get_user_op_hash() {
+        let rpc_project_id = ""; // Fill the project ID
+        let chain_id = "eip155:11155111";
+        // Entrypoint v07 contract address
+        let contract_address = "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+            .parse::<H160>()
+            .unwrap();
+        // Dummy sender address
+        let sender_address = "0x1234567890123456789012345678901234567890"
+            .parse::<H160>()
+            .unwrap();
+        // Dummy user operation
+        let user_op = UserOperation {
+            sender: sender_address,
+            nonce: U256::zero(),
+            call_data: Bytes::from(vec![0x04, 0x05, 0x06]),
+            call_gas_limit: U128::zero(),
+            verification_gas_limit: U128::zero(),
+            pre_verification_gas: U256::zero(),
+            max_fee_per_gas: U128::zero(),
+            max_priority_fee_per_gas: U128::zero(),
+            signature: Bytes::from(vec![0x0a, 0x0b, 0x0c]),
+            factory: None,
+            factory_data: None,
+            paymaster: None,
+            paymaster_data: None,
+            paymaster_post_op_gas_limit: None,
+            paymaster_verification_gas_limit: None,
+        };
+
+        let result = call_get_user_op_hash(rpc_project_id, chain_id, contract_address, user_op)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            hex::encode(result),
+            "a5e787e98d421a0e62b2457e525bc8a4b1bde14cc71d48c0cf139b0b1fadb1cc"
         );
     }
 }

@@ -4,9 +4,9 @@ use {
         auth::{Auth, PublicKey},
         Client, Key,
     },
+    irn_rpc::identity::Keypair,
     serde::Deserialize,
-    std::net::SocketAddr,
-    std::time::Duration,
+    std::{net::SocketAddr, time::Duration},
 };
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(1);
@@ -14,6 +14,36 @@ const MAX_OPERATION_TIME: Duration = Duration::from_secs(3);
 const CONNECTION_TIMEOUT: Duration = Duration::from_secs(3);
 const RECORDS_TTL: Duration = Duration::from_secs(60 * 60 * 24 * 30); // 30 days
 const UDP_SOCKET_COUNT: usize = 1;
+
+/// IRN storage operation type
+#[derive(Debug)]
+pub enum OperationType {
+    Hset,
+    Hget,
+    Hfields,
+    Hdel,
+    Set,
+    Get,
+}
+
+impl OperationType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            OperationType::Hset => "hset",
+            OperationType::Hget => "hget",
+            OperationType::Hfields => "hfields",
+            OperationType::Hdel => "hdel",
+            OperationType::Set => "set",
+            OperationType::Get => "get",
+        }
+    }
+}
+
+impl From<OperationType> for String {
+    fn from(value: OperationType) -> Self {
+        value.as_str().to_string()
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Eq, PartialEq)]
 pub struct Config {
@@ -36,24 +66,25 @@ impl Irn {
         namespace: String,
         namespace_secret: String,
     ) -> Result<Self, StorageError> {
-        let key = irn_api::auth::client_key_from_bytes(
-            key_base64.as_bytes(),
-            irn_api::auth::Encoding::Base64,
+        let keypair = Keypair::ed25519_from_bytes(
+            data_encoding::BASE64
+                .decode(key_base64.as_bytes())
+                .map_err(|_| StorageError::WrongKey(key_base64.clone()))?,
         )
         .map_err(|_| StorageError::WrongKey(key_base64))?;
         // Generating peer_id. This should be replaced by the actual peer_id
         // in a future
-        let peer_id = irn_network::Keypair::generate_ed25519()
+        let peer_id = irn_rpc::identity::Keypair::generate_ed25519()
             .public()
             .to_peer_id();
         let node_addr = node_addr
             .parse::<SocketAddr>()
             .map_err(|_| StorageError::WrongNodeAddress(node_addr))?;
-        let address = (peer_id, irn_network::socketaddr_to_multiaddr(node_addr));
+        let address = (peer_id, irn_rpc::quic::socketaddr_to_multiaddr(node_addr));
         let namespace = Auth::from_secret(namespace_secret.as_bytes(), namespace.as_bytes())
             .map_err(|_| StorageError::WrongNamespace(namespace))?;
         let client = Client::new(irn_api::client::Config {
-            key,
+            keypair,
             nodes: [address].into(),
             shadowing_nodes: Default::default(),
             shadowing_factor: 0.0,
@@ -62,6 +93,7 @@ impl Irn {
             connection_timeout: CONNECTION_TIMEOUT,
             udp_socket_count: UDP_SOCKET_COUNT,
             namespaces: vec![namespace.clone()],
+            shadowing_default_namespace: None,
         })?;
 
         Ok(Self {
@@ -90,11 +122,7 @@ impl Irn {
     /// Set a value in the storage
     pub async fn set(&self, key: String, value: Vec<u8>) -> Result<(), StorageError> {
         self.client
-            .set(
-                self.key(key.as_bytes().into()),
-                value,
-                Some(self.calculate_ttl()),
-            )
+            .set(self.key(key.as_bytes().into()), value, self.calculate_ttl())
             .await
             .map_err(StorageError::IrnClientError)
     }
@@ -133,7 +161,7 @@ impl Irn {
                 self.key(key.as_bytes().into()),
                 field.as_bytes().into(),
                 value,
-                Some(self.calculate_ttl()),
+                self.calculate_ttl(),
             )
             .await
             .map_err(StorageError::IrnClientError)

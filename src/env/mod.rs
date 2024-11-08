@@ -3,6 +3,7 @@ use {
         analytics::Config as AnalyticsConfig,
         database::config::PostgresConfig,
         error,
+        names::Config as NamesConfig,
         profiler::ProfilerConfig,
         project::{storage::Config as StorageConfig, Config as RegistryConfig},
         providers::{ProviderKind, ProvidersConfig, Weight},
@@ -13,11 +14,12 @@ use {
     std::{collections::HashMap, fmt::Display},
 };
 pub use {
-    aurora::*, base::*, binance::*, getblock::*, infura::*, mantle::*, near::*, pokt::*,
-    publicnode::*, quicknode::*, server::*, zksync::*, zora::*,
+    aurora::*, base::*, berachain::*, binance::*, getblock::*, infura::*, mantle::*, near::*,
+    pokt::*, publicnode::*, quicknode::*, server::*, unichain::*, zksync::*, zora::*,
 };
 mod aurora;
 mod base;
+mod berachain;
 mod binance;
 mod getblock;
 mod infura;
@@ -27,6 +29,7 @@ mod pokt;
 mod publicnode;
 mod quicknode;
 mod server;
+mod unichain;
 mod zksync;
 mod zora;
 
@@ -50,6 +53,7 @@ pub struct Config {
     pub providers: ProvidersConfig,
     pub rate_limiting: RateLimitingConfig,
     pub irn: IrnConfig,
+    pub names: NamesConfig,
 }
 
 impl Config {
@@ -64,6 +68,7 @@ impl Config {
             providers: from_env("RPC_PROXY_PROVIDER_")?,
             rate_limiting: from_env("RPC_PROXY_RATE_LIMITING_")?,
             irn: from_env("RPC_PROXY_IRN_")?,
+            names: from_env("RPC_PROXY_NAMES_")?,
         })
     }
 }
@@ -79,12 +84,14 @@ pub trait ProviderConfig {
 }
 
 #[cfg(test)]
+#[cfg(not(feature = "test-mock-bundler"))] // These tests depend on environment variables
 mod test {
     use {
         crate::{
             analytics,
             database::config::PostgresConfig,
             env::{Config, ServerConfig},
+            names::Config as NamesConfig,
             profiler::ProfilerConfig,
             project,
             providers::ProvidersConfig,
@@ -142,18 +149,32 @@ mod test {
             ("RPC_PROXY_ANALYTICS_S3_ENDPOINT", "s3://127.0.0.1"),
             ("RPC_PROXY_ANALYTICS_EXPORT_BUCKET", "EXPORT_BUCKET"),
             // Providers config
+            (
+                "RPC_PROXY_PROVIDER_CACHE_REDIS_ADDR",
+                "redis://127.0.0.1/providers_cache",
+            ),
             ("RPC_PROXY_PROVIDER_INFURA_PROJECT_ID", "INFURA_PROJECT_ID"),
             ("RPC_PROXY_PROVIDER_POKT_PROJECT_ID", "POKT_PROJECT_ID"),
             ("RPC_PROXY_PROVIDER_ZERION_API_KEY", "ZERION_API_KEY"),
             (
-                "RPC_PROXY_PROVIDER_QUICKNODE_API_TOKEN",
-                "QUICKNODE_API_TOKEN",
+                "RPC_PROXY_PROVIDER_QUICKNODE_API_TOKENS",
+                "QUICKNODE_API_TOKENS",
             ),
             ("RPC_PROXY_PROVIDER_COINBASE_API_KEY", "COINBASE_API_KEY"),
             ("RPC_PROXY_PROVIDER_COINBASE_APP_ID", "COINBASE_APP_ID"),
             ("RPC_PROXY_PROVIDER_ONE_INCH_API_KEY", "ONE_INCH_API_KEY"),
             ("RPC_PROXY_PROVIDER_ONE_INCH_REFERRER", "ONE_INCH_REFERRER"),
             ("RPC_PROXY_PROVIDER_GETBLOCK_ACCESS_TOKENS", "{}"),
+            ("RPC_PROXY_PROVIDER_PIMLICO_API_KEY", "PIMLICO_API_KEY"),
+            (
+                "RPC_PROXY_PROVIDER_SOLSCAN_API_V1_TOKEN",
+                "SOLSCAN_API_V1_TOKEN",
+            ),
+            (
+                "RPC_PROXY_PROVIDER_SOLSCAN_API_V2_TOKEN",
+                "SOLSCAN_API_V2_TOKEN",
+            ),
+            ("RPC_PROXY_PROVIDER_BUNGEE_API_KEY", "BUNGEE_API_KEY"),
             (
                 "RPC_PROXY_PROVIDER_PROMETHEUS_QUERY_URL",
                 "PROMETHEUS_QUERY_URL",
@@ -172,11 +193,17 @@ mod test {
             ("RPC_PROXY_RATE_LIMITING_MAX_TOKENS", "100"),
             ("RPC_PROXY_RATE_LIMITING_REFILL_INTERVAL_SEC", "1"),
             ("RPC_PROXY_RATE_LIMITING_REFILL_RATE", "10"),
+            (
+                "RPC_PROXY_RATE_LIMITING_IP_WHITELIST",
+                "127.0.0.1,127.0.0.2",
+            ),
             // IRN config.
             ("RPC_PROXY_IRN_NODE", "node"),
             ("RPC_PROXY_IRN_KEY", "key"),
             ("RPC_PROXY_IRN_NAMESPACE", "namespace"),
             ("RPC_PROXY_IRN_NAMESPACE_SECRET", "namespace"),
+            // Names configuration
+            ("RPC_PROXY_NAMES_ALLOWED_ZONES", "test1.id,test2.id"),
         ];
 
         values.iter().for_each(set_env_var);
@@ -236,20 +263,27 @@ mod test {
                 providers: ProvidersConfig {
                     prometheus_query_url: Some("PROMETHEUS_QUERY_URL".to_owned()),
                     prometheus_workspace_header: Some("PROMETHEUS_WORKSPACE_HEADER".to_owned()),
+                    cache_redis_addr: Some("redis://127.0.0.1/providers_cache".to_owned()),
                     infura_project_id: "INFURA_PROJECT_ID".to_string(),
                     pokt_project_id: "POKT_PROJECT_ID".to_string(),
-                    quicknode_api_token: "QUICKNODE_API_TOKEN".to_string(),
+                    quicknode_api_tokens: "QUICKNODE_API_TOKENS".to_string(),
                     zerion_api_key: Some("ZERION_API_KEY".to_owned()),
                     coinbase_api_key: Some("COINBASE_API_KEY".to_owned()),
                     coinbase_app_id: Some("COINBASE_APP_ID".to_owned()),
                     one_inch_api_key: Some("ONE_INCH_API_KEY".to_owned()),
                     one_inch_referrer: Some("ONE_INCH_REFERRER".to_owned()),
                     getblock_access_tokens: Some("{}".to_owned()),
+                    pimlico_api_key: "PIMLICO_API_KEY".to_string(),
+                    solscan_api_v1_token: "SOLSCAN_API_V1_TOKEN".to_string(),
+                    solscan_api_v2_token: "SOLSCAN_API_V2_TOKEN".to_string(),
+                    bungee_api_key: "BUNGEE_API_KEY".to_string(),
+                    override_bundler_urls: None,
                 },
                 rate_limiting: RateLimitingConfig {
                     max_tokens: Some(100),
                     refill_interval_sec: Some(1),
                     refill_rate: Some(10),
+                    ip_whitelist: Some(vec!["127.0.0.1".into(), "127.0.0.2".into()]),
                 },
                 irn: IrnConfig {
                     node: Some("node".to_owned()),
@@ -257,6 +291,9 @@ mod test {
                     namespace: Some("namespace".to_owned()),
                     namespace_secret: Some("namespace".to_owned()),
                 },
+                names: NamesConfig {
+                    allowed_zones: Some(vec!["test1.id".to_owned(), "test2.id".to_owned()]),
+                }
             }
         );
 

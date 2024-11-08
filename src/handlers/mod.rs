@@ -13,6 +13,8 @@ use {
 };
 
 pub mod balance;
+pub mod bundler;
+pub mod chain_agnostic;
 pub mod convert;
 pub mod fungible_price;
 pub mod generators;
@@ -26,6 +28,7 @@ pub mod profile;
 pub mod proxy;
 pub mod sessions;
 pub mod supported_chains;
+pub mod wallet;
 pub mod ws_proxy;
 
 static HANDLER_TASK_METRICS: TaskMetrics = TaskMetrics::new("handler_task");
@@ -43,12 +46,7 @@ pub struct RpcQueryParams {
     pub source: Option<MessageSource>,
 }
 
-#[derive(Serialize)]
-pub struct SuccessResponse {
-    status: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum SupportedCurrencies {
     BTC,

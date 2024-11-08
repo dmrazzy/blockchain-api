@@ -76,6 +76,7 @@ resource "aws_ecs_task_definition" "app_task" {
       essential = true,
 
       environment = [
+        { name = "RPC_PROXY_LOG_LEVEL", value = var.log_level },
         { name = "RPC_PROXY_PORT", value = tostring(var.port) },
         { name = "RPC_PROXY_PROMETHEUS_PORT", value = tostring(local.otel_port) },
 
@@ -87,13 +88,17 @@ resource "aws_ecs_task_definition" "app_task" {
 
         { name = "RPC_PROXY_PROVIDER_INFURA_PROJECT_ID", value = var.infura_project_id },
         { name = "RPC_PROXY_PROVIDER_POKT_PROJECT_ID", value = var.pokt_project_id },
-        { name = "RPC_PROXY_PROVIDER_QUICKNODE_API_TOKEN", value = var.quicknode_api_token },
+        { name = "RPC_PROXY_PROVIDER_QUICKNODE_API_TOKENS", value = var.quicknode_api_tokens },
         { name = "RPC_PROXY_PROVIDER_ZERION_API_KEY", value = var.zerion_api_key },
         { name = "RPC_PROXY_PROVIDER_COINBASE_API_KEY", value = var.coinbase_api_key },
         { name = "RPC_PROXY_PROVIDER_COINBASE_APP_ID", value = var.coinbase_app_id },
         { name = "RPC_PROXY_PROVIDER_ONE_INCH_API_KEY", value = var.one_inch_api_key },
         { name = "RPC_PROXY_PROVIDER_ONE_INCH_REFERRER", value = var.one_inch_referrer },
         { name = "RPC_PROXY_PROVIDER_GETBLOCK_ACCESS_TOKENS", value = var.getblock_access_tokens },
+        { name = "RPC_PROXY_PROVIDER_PIMLICO_API_KEY", value = var.pimlico_api_key },
+        { name = "RPC_PROXY_PROVIDER_SOLSCAN_API_V1_TOKEN", value = var.solscan_api_v1_token },
+        { name = "RPC_PROXY_PROVIDER_SOLSCAN_API_V2_TOKEN", value = var.solscan_api_v2_token },
+        { name = "RPC_PROXY_PROVIDER_BUNGEE_API_KEY", value = var.bungee_api_key },
 
         { name = "RPC_PROXY_PROVIDER_PROMETHEUS_QUERY_URL", value = "http://127.0.0.1:${local.prometheus_proxy_port}/workspaces/${var.prometheus_workspace_id}" },
         { name = "RPC_PROXY_PROVIDER_PROMETHEUS_WORKSPACE_HEADER", value = "aps-workspaces.${module.this.region}.amazonaws.com" },
@@ -109,10 +114,12 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "RPC_PROXY_STORAGE_IDENTITY_CACHE_REDIS_ADDR_WRITE", value = "redis://${var.identity_cache_endpoint_write}/1" },
         { name = "RPC_PROXY_STORAGE_RATE_LIMITING_CACHE_REDIS_ADDR_READ", value = "redis://${var.rate_limiting_cache_endpoint_read}/2" },
         { name = "RPC_PROXY_STORAGE_RATE_LIMITING_CACHE_REDIS_ADDR_WRITE", value = "redis://${var.rate_limiting_cache_endpoint_write}/2" },
+        { name = "RPC_PROXY_PROVIDER_CACHE_REDIS_ADDR", value = "redis://${var.provider_cache_endpoint}/3" },
 
         { name = "RPC_PROXY_RATE_LIMITING_MAX_TOKENS", value = tostring(var.rate_limiting_max_tokens) },
         { name = "RPC_PROXY_RATE_LIMITING_REFILL_INTERVAL_SEC", value = tostring(var.rate_limiting_refill_interval) },
         { name = "RPC_PROXY_RATE_LIMITING_REFILL_RATE", value = tostring(var.rate_limiting_refill_rate) },
+        { name = "RPC_PROXY_RATE_LIMITING_IP_WHITELIST", value = var.rate_limiting_ip_whitelist },
 
         { name = "RPC_PROXY_POSTGRES_URI", value = var.postgres_url },
 
@@ -120,6 +127,8 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "RPC_PROXY_IRN_KEY", value = var.irn_key },
         { name = "RPC_PROXY_IRN_NAMESPACE", value = var.irn_namespace },
         { name = "RPC_PROXY_IRN_NAMESPACE_SECRET", value = var.irn_namespace_secret },
+
+        { name = "RPC_PROXY_NAMES_ALLOWED_ZONES", value = var.names_allowed_zones },
 
         { name = "RPC_PROXY_ANALYTICS_EXPORT_BUCKET", value = var.analytics_datalake_bucket_name },
       ],

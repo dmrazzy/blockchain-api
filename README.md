@@ -50,6 +50,19 @@ curl -X POST "http://localhost:3000/v1?chainId=eip155:1&projectId=someid" --data
 just devloop
 ```
 
+### Manual integrations test run
+
+You can run manual integration tests by invoking the `yarn integration` command. 
+The following environment variables are expected to be passed:
+
+* `RPC_URL` - URL of the server to test. Use `http://localhost:3000` for the local testing.
+* `PROJECT_ID` - Unique project identifier.
+
+If you want to run certain test from the suite you can pass `-t` with the name of the
+test or test suite to run.
+
+For passing `Exact provider request` and disabled cache tests you need to provide a valid `RPC_PROXY_TESTING_PROJECT_ID`.
+
 ### Docker
 
 ```console
@@ -57,7 +70,7 @@ $ docker build . --tag rpc-proxy:
 $ docker run -p 3000:3000 \
     -e RPC_PROXY_POKT_PROJECT_ID=<some_id> \
     -e RPC_PROXY_INFURA_PROJECT_ID=<some_id> \
-    -e RPC_PROXY_QUICKNODE_API_TOKEN=<some_id> \
+    -e RPC_PROXY_QUICKNODE_API_TOKENS=<JSON> \
     -e RPC_PROXY_REGISTRY_API_URL=<registry_url> \
     -e RPC_PROXY_REGISTRY_API_AUTH_TOKEN=<token> \
     --name rpc -it rpc-proxy
@@ -70,7 +83,7 @@ If you need to test with registry caching activated, you can use `docker-compose
 ```console
 $ RPC_PROXY_POKT_PROJECT_ID=<some_id> \
   RPC_PROXY_INFURA_PROJECT_ID=<some_id> \
-  RPC_PROXY_QUICKNODE_API_TOKEN=<some_id> \
+  RPC_PROXY_QUICKNODE_API_TOKENS=<JSON> \
   RPC_PROXY_REGISTRY_API_AUTH_TOKEN=<token> \
   docker-compose up
 ```

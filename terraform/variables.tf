@@ -46,7 +46,7 @@ variable "app_autoscaling_min_capacity" {
 variable "app_autoscaling_max_capacity" {
   description = "The maximum number of tasks to run when autoscaling"
   type        = number
-  default     = 8
+  default     = 10
 }
 
 variable "ofac_blocked_countries" {
@@ -97,8 +97,8 @@ variable "zerion_api_key" {
   sensitive   = true
 }
 
-variable "quicknode_api_token" {
-  description = "The API key for Quicknode"
+variable "quicknode_api_tokens" {
+  description = "API keys for Quicknode in JSON format"
   type        = string
   sensitive   = true
 }
@@ -129,6 +129,30 @@ variable "one_inch_referrer" {
 
 variable "getblock_access_tokens" {
   description = "Mapping of API access tokens for GetBlock in JSON format"
+  type        = string
+  sensitive   = true
+}
+
+variable "pimlico_api_key" {
+  description = "Pimlico bundler API token key"
+  type        = string
+  sensitive   = true
+}
+
+variable "solscan_api_v1_token" {
+  description = "Solscan API v1 token"
+  type        = string
+  sensitive   = true
+}
+
+variable "solscan_api_v2_token" {
+  description = "Solscan API v2 token"
+  type        = string
+  sensitive   = true
+}
+
+variable "bungee_api_key" {
+  description = "Bungee API key"
   type        = string
   sensitive   = true
 }
@@ -189,6 +213,11 @@ variable "rate_limiting_refill_rate" {
   default     = 3
 }
 
+variable "rate_limiting_ip_whitelist" {
+  description = "Comma separated list of whitelisted IPs"
+  type        = string
+}
+
 #-------------------------------------------------------------------------------
 # IRN VPC peering
 
@@ -227,5 +256,13 @@ variable "irn_namespace" {
 
 variable "irn_namespace_secret" {
   description = "IRN storage namespace secret key"
+  type        = string
+}
+
+#-------------------------------------------------------------------------------
+# Names configuration
+
+variable "names_allowed_zones" {
+  description = "Comma separated list of allowed zones for names"
   type        = string
 }

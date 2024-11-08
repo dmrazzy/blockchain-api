@@ -18,16 +18,18 @@ use {
         Router,
     },
     env::{
-        AuroraConfig, BaseConfig, BinanceConfig, GetBlockConfig, InfuraConfig, MantleConfig,
-        NearConfig, PoktConfig, PublicnodeConfig, QuicknodeConfig, ZKSyncConfig, ZoraConfig,
+        AuroraConfig, BaseConfig, BerachainConfig, BinanceConfig, GetBlockConfig, InfuraConfig,
+        MantleConfig, NearConfig, PoktConfig, PublicnodeConfig, QuicknodeConfig, UnichainConfig,
+        ZKSyncConfig, ZoraConfig,
     },
     error::RpcResult,
     http::Request,
     hyper::{header::HeaderName, http, server::conn::AddrIncoming, Body, Server},
     providers::{
-        AuroraProvider, BaseProvider, BinanceProvider, GetBlockProvider, InfuraProvider,
-        InfuraWsProvider, MantleProvider, NearProvider, PoktProvider, ProviderRepository,
-        PublicnodeProvider, QuicknodeProvider, ZKSyncProvider, ZoraProvider, ZoraWsProvider,
+        AuroraProvider, BaseProvider, BerachainProvider, BinanceProvider, GetBlockProvider,
+        InfuraProvider, InfuraWsProvider, MantleProvider, NearProvider, PoktProvider,
+        ProviderRepository, PublicnodeProvider, QuicknodeProvider, UnichainProvider,
+        ZKSyncProvider, ZoraProvider, ZoraWsProvider,
     },
     sqlx::postgres::PgPoolOptions,
     std::{
@@ -53,9 +55,6 @@ use {
     },
 };
 
-const KEEPALIVE_IDLE_DURATION: Duration = Duration::from_secs(60);
-const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(10);
-const KEEPALIVE_RETRIES: u32 = 5;
 const DB_STATS_POLLING_INTERVAL: Duration = Duration::from_secs(3600);
 
 mod analytics;
@@ -65,12 +64,14 @@ pub mod error;
 pub mod handlers;
 mod json_rpc;
 mod metrics;
+pub mod names;
 pub mod profiler;
 mod project;
 pub mod providers;
 mod state;
 mod storage;
-mod utils;
+pub mod test_helpers;
+pub mod utils;
 mod ws;
 
 pub async fn bootstrap(config: Config) -> RpcResult<()> {
@@ -93,18 +94,22 @@ pub async fn bootstrap(config: Config) -> RpcResult<()> {
                 config.rate_limiting.max_tokens,
                 config.rate_limiting.refill_interval_sec,
                 config.rate_limiting.refill_rate,
+                config.rate_limiting.ip_whitelist.clone(),
             ) {
-                (Some(max_tokens), Some(refill_interval_sec), Some(refill_rate)) => {
+                (Some(max_tokens), Some(refill_interval_sec), Some(refill_rate), ip_whitelist) => {
                     info!(
                         "Rate limiting is enabled with the following configuration: \
-                         max_tokens={}, refill_interval_sec={}, refill_rate={}",
-                        max_tokens, refill_interval_sec, refill_rate
+                         max_tokens={}, refill_interval_sec={}, refill_rate={}, ip_whitelist={:?}",
+                        max_tokens, refill_interval_sec, refill_rate, ip_whitelist
                     );
                     RateLimit::new(
                         redis_addr.write(),
+                        config.storage.redis_max_connections,
                         max_tokens,
                         chrono::Duration::seconds(refill_interval_sec as i64),
                         refill_rate,
+                        metrics.clone(),
+                        ip_whitelist,
                     )
                 }
                 _ => {
@@ -337,7 +342,18 @@ pub async fn bootstrap(config: Config) -> RpcResult<()> {
         // Sessions
         .route("/v1/sessions/:address", post(handlers::sessions::create::handler))
         .route("/v1/sessions/:address", get(handlers::sessions::list::handler))
-        .route("/v1/sessions/:address/:pci", get(handlers::sessions::get::handler))
+        .route("/v1/sessions/:address/getcontext", get(handlers::sessions::get::handler))
+        .route("/v1/sessions/:address/activate", post(handlers::sessions::context::handler))
+        .route("/v1/sessions/:address/revoke", post(handlers::sessions::revoke::handler))
+        .route("/v1/sessions/:address/sign", post(handlers::sessions::cosign::handler))
+        // Bundler
+        .route("/v1/bundler", post(handlers::bundler::handler))
+        // Wallet
+        .route("/v1/wallet", post(handlers::wallet::handler::handler))
+        // Chain agnostic orchestration
+        .route("/v1/ca/orchestrator/check", post(handlers::chain_agnostic::check::handler))
+        .route("/v1/ca/orchestrator/route", post(handlers::chain_agnostic::route::handler))
+        .route("/v1/ca/orchestrator/status", get(handlers::chain_agnostic::status::handler))
         // Health
         .route("/health", get(handlers::health::handler))
         .route_layer(tracing_and_metrics_layer)
@@ -443,13 +459,7 @@ fn create_server(
     app: Router,
     addr: &SocketAddr,
 ) -> Server<AddrIncoming, IntoMakeServiceWithConnectInfo<Router, SocketAddr>> {
-    axum::Server::bind(addr)
-        .tcp_keepalive(Some(KEEPALIVE_IDLE_DURATION))
-        .tcp_keepalive_interval(Some(KEEPALIVE_INTERVAL))
-        .tcp_keepalive_retries(Some(KEEPALIVE_RETRIES))
-        .tcp_sleep_on_accept_errors(true)
-        .tcp_nodelay(true)
-        .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+    axum::Server::bind(addr).serve(app.into_make_service_with_connect_info::<SocketAddr>())
 }
 
 fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
@@ -466,7 +476,7 @@ fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
     providers.add_provider::<ZKSyncProvider, ZKSyncConfig>(ZKSyncConfig::default());
     providers.add_provider::<PublicnodeProvider, PublicnodeConfig>(PublicnodeConfig::default());
     providers.add_provider::<QuicknodeProvider, QuicknodeConfig>(QuicknodeConfig::new(
-        config.quicknode_api_token.clone(),
+        config.quicknode_api_tokens.clone(),
     ));
     providers.add_provider::<InfuraProvider, InfuraConfig>(InfuraConfig::new(
         config.infura_project_id.clone(),
@@ -474,6 +484,8 @@ fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
     providers.add_provider::<ZoraProvider, ZoraConfig>(ZoraConfig::default());
     providers.add_provider::<NearProvider, NearConfig>(NearConfig::default());
     providers.add_provider::<MantleProvider, MantleConfig>(MantleConfig::default());
+    providers.add_provider::<BerachainProvider, BerachainConfig>(BerachainConfig::default());
+    providers.add_provider::<UnichainProvider, UnichainConfig>(UnichainConfig::default());
 
     if let Some(getblock_access_tokens) = &config.getblock_access_tokens {
         providers.add_provider::<GetBlockProvider, GetBlockConfig>(GetBlockConfig::new(

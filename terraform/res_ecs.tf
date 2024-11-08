@@ -58,19 +58,24 @@ module "ecs" {
   identity_cache_endpoint_write      = module.redis.endpoint
   rate_limiting_cache_endpoint_read  = module.redis.endpoint
   rate_limiting_cache_endpoint_write = module.redis.endpoint
+  provider_cache_endpoint            = module.redis.endpoint
   ofac_blocked_countries             = var.ofac_blocked_countries
   postgres_url                       = module.postgres.database_url
 
   # Providers
   infura_project_id      = var.infura_project_id
   pokt_project_id        = var.pokt_project_id
-  quicknode_api_token    = var.quicknode_api_token
+  quicknode_api_tokens   = var.quicknode_api_tokens
   zerion_api_key         = var.zerion_api_key
   coinbase_api_key       = var.coinbase_api_key
   coinbase_app_id        = var.coinbase_app_id
   one_inch_api_key       = var.one_inch_api_key
   one_inch_referrer      = var.one_inch_referrer
   getblock_access_tokens = var.getblock_access_tokens
+  pimlico_api_key        = var.pimlico_api_key
+  solscan_api_v1_token   = var.solscan_api_v1_token
+  solscan_api_v2_token   = var.solscan_api_v2_token
+  bungee_api_key         = var.bungee_api_key
 
   # Project Registry
   registry_api_endpoint   = var.registry_api_endpoint
@@ -81,12 +86,16 @@ module "ecs" {
   rate_limiting_max_tokens      = var.rate_limiting_max_tokens
   rate_limiting_refill_interval = var.rate_limiting_refill_interval
   rate_limiting_refill_rate     = var.rate_limiting_refill_rate
+  rate_limiting_ip_whitelist    = var.rate_limiting_ip_whitelist
 
   # IRN Client
   irn_node             = var.irn_node
   irn_key              = var.irn_key
   irn_namespace        = var.irn_namespace
   irn_namespace_secret = var.irn_namespace_secret
+
+  # ENS Names
+  names_allowed_zones = var.names_allowed_zones
 
   # Analytics
   analytics_datalake_bucket_name = data.terraform_remote_state.datalake.outputs.datalake_bucket_id

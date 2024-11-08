@@ -22,35 +22,49 @@ use {
             portfolio::{PortfolioQueryParams, PortfolioResponseBody},
             RpcQueryParams, SupportedCurrencies,
         },
+        utils::crypto::CaipNamespaces,
+        Metrics,
+    },
+    alloy::{
+        primitives::{Address, U256},
+        rpc::json_rpc::Id,
     },
     async_trait::async_trait,
     axum::response::Response,
     axum_tungstenite::WebSocketUpgrade,
     hyper::http::HeaderValue,
+    mock_alto::{MockAltoProvider, MockAltoUrls},
     rand::{distributions::WeightedIndex, prelude::Distribution, rngs::OsRng},
     serde::{Deserialize, Serialize},
+    serde_json::Value,
     std::{
         collections::{HashMap, HashSet},
         fmt::{Debug, Display},
         hash::Hash,
         sync::Arc,
     },
-    tracing::{debug, log::warn},
+    tracing::{debug, error, log::warn},
     wc::metrics::TaskMetrics,
 };
 
 mod aurora;
 mod base;
+mod berachain;
 mod binance;
+mod bungee;
 mod coinbase;
 mod getblock;
 mod infura;
 mod mantle;
+pub mod mock_alto;
 mod near;
 mod one_inch;
+mod pimlico;
 mod pokt;
 mod publicnode;
 mod quicknode;
+mod solscan;
+mod unichain;
 mod weights;
 pub mod zerion;
 mod zksync;
@@ -59,15 +73,20 @@ mod zora;
 pub use {
     aurora::AuroraProvider,
     base::BaseProvider,
+    berachain::BerachainProvider,
     binance::BinanceProvider,
+    bungee::BungeeProvider,
     getblock::GetBlockProvider,
     infura::{InfuraProvider, InfuraWsProvider},
     mantle::MantleProvider,
     near::NearProvider,
     one_inch::OneInchProvider,
+    pimlico::PimlicoProvider,
     pokt::PoktProvider,
     publicnode::PublicnodeProvider,
     quicknode::QuicknodeProvider,
+    solscan::SolScanProvider,
+    unichain::UnichainProvider,
     zksync::ZKSyncProvider,
     zora::{ZoraProvider, ZoraWsProvider},
 };
@@ -81,9 +100,12 @@ pub struct ProvidersConfig {
     pub prometheus_query_url: Option<String>,
     pub prometheus_workspace_header: Option<String>,
 
+    /// Redis address for provider's responses caching
+    pub cache_redis_addr: Option<String>,
+
     pub infura_project_id: String,
     pub pokt_project_id: String,
-    pub quicknode_api_token: String,
+    pub quicknode_api_tokens: String,
 
     pub zerion_api_key: Option<String>,
     pub coinbase_api_key: Option<String>,
@@ -92,6 +114,15 @@ pub struct ProvidersConfig {
     pub one_inch_referrer: Option<String>,
     /// GetBlock provider access tokens in JSON format
     pub getblock_access_tokens: Option<String>,
+    /// Pimlico API token key
+    pub pimlico_api_key: String,
+    /// SolScan API v1 and v2 token keys
+    pub solscan_api_v1_token: String,
+    pub solscan_api_v2_token: String,
+    /// Bungee API key
+    pub bungee_api_key: String,
+
+    pub override_bundler_urls: Option<MockAltoUrls>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -112,13 +143,15 @@ pub struct ProviderRepository {
     prometheus_client: prometheus_http_query::Client,
     prometheus_workspace_header: String,
 
-    pub history_provider: Arc<dyn HistoryProvider>,
+    pub history_providers: HashMap<CaipNamespaces, Arc<dyn HistoryProvider>>,
     pub portfolio_provider: Arc<dyn PortfolioProvider>,
     pub coinbase_pay_provider: Arc<dyn HistoryProvider>,
     pub onramp_provider: Arc<dyn OnRampProvider>,
-    pub balance_provider: Arc<dyn BalanceProvider>,
+    pub balance_providers: HashMap<CaipNamespaces, Arc<dyn BalanceProvider>>,
     pub conversion_provider: Arc<dyn ConversionProvider>,
-    pub fungible_price_provider: Arc<dyn FungiblePriceProvider>,
+    pub fungible_price_providers: HashMap<CaipNamespaces, Arc<dyn FungiblePriceProvider>>,
+    pub bundler_ops_provider: Arc<dyn BundlerOpsProvider>,
+    pub chain_orchestrator_provider: Arc<dyn ChainOrchestrationProvider>,
 }
 
 impl ProviderRepository {
@@ -138,6 +171,27 @@ impl ProviderRepository {
             .prometheus_workspace_header
             .clone()
             .unwrap_or("localhost:9090".into());
+
+        // Redis pool for providers responses caching where needed
+        let mut redis_pool = None;
+        if let Some(redis_addr) = &config.cache_redis_addr {
+            let redis_builder = deadpool_redis::Config::from_url(redis_addr)
+                .builder()
+                .map_err(|e| {
+                    error!(
+                        "Failed to create redis pool builder for provider's responses caching: {:?}",
+                        e
+                    );
+                })
+                .expect("Failed to create redis pool builder for provider's responses caching, builder is None");
+
+            redis_pool = Some(Arc::new(
+                redis_builder
+                    .runtime(deadpool_redis::Runtime::Tokio1)
+                    .build()
+                    .expect("Failed to create redis pool"),
+            ));
+        };
 
         // Don't crash the application if the ZERION_API_KEY is not set
         // TODO: find a better way to handle this
@@ -173,15 +227,43 @@ impl ProviderRepository {
 
         let zerion_provider = Arc::new(ZerionProvider::new(zerion_api_key));
         let one_inch_provider = Arc::new(OneInchProvider::new(one_inch_api_key, one_inch_referrer));
-        let history_provider = zerion_provider.clone();
         let portfolio_provider = zerion_provider.clone();
-        let balance_provider = zerion_provider.clone();
+        let solscan_provider = Arc::new(SolScanProvider::new(
+            config.solscan_api_v1_token.clone(),
+            config.solscan_api_v2_token.clone(),
+            redis_pool.clone(),
+        ));
+
+        let mut balance_providers: HashMap<CaipNamespaces, Arc<dyn BalanceProvider>> =
+            HashMap::new();
+        balance_providers.insert(CaipNamespaces::Eip155, zerion_provider.clone());
+        balance_providers.insert(CaipNamespaces::Solana, solscan_provider.clone());
+
+        let mut history_providers: HashMap<CaipNamespaces, Arc<dyn HistoryProvider>> =
+            HashMap::new();
+        history_providers.insert(CaipNamespaces::Eip155, zerion_provider.clone());
+        history_providers.insert(CaipNamespaces::Solana, solscan_provider.clone());
 
         let coinbase_pay_provider = Arc::new(CoinbaseProvider::new(
             coinbase_api_key,
             coinbase_app_id,
             "https://pay.coinbase.com/api/v1".into(),
         ));
+
+        let bundler_ops_provider: Arc<dyn BundlerOpsProvider> =
+            if let Some(override_bundler_url) = config.override_bundler_urls.clone() {
+                Arc::new(MockAltoProvider::new(override_bundler_url))
+            } else {
+                Arc::new(PimlicoProvider::new(config.pimlico_api_key.clone()))
+            };
+
+        let mut fungible_price_providers: HashMap<CaipNamespaces, Arc<dyn FungiblePriceProvider>> =
+            HashMap::new();
+        fungible_price_providers.insert(CaipNamespaces::Eip155, one_inch_provider.clone());
+        fungible_price_providers.insert(CaipNamespaces::Solana, solscan_provider.clone());
+
+        let chain_orchestrator_provider =
+            Arc::new(BungeeProvider::new(config.bungee_api_key.clone()));
 
         Self {
             supported_chains: SupportedChains {
@@ -194,13 +276,15 @@ impl ProviderRepository {
             ws_weight_resolver: HashMap::new(),
             prometheus_client,
             prometheus_workspace_header,
-            history_provider,
+            history_providers,
             portfolio_provider,
             coinbase_pay_provider: coinbase_pay_provider.clone(),
             onramp_provider: coinbase_pay_provider,
-            balance_provider,
+            balance_providers,
             conversion_provider: one_inch_provider.clone(),
-            fungible_price_provider: one_inch_provider.clone(),
+            fungible_price_providers,
+            bundler_ops_provider,
+            chain_orchestrator_provider,
         }
     }
 
@@ -218,7 +302,11 @@ impl ProviderRepository {
             return Err(RpcError::UnsupportedChain(chain_id.to_string()));
         }
 
-        let weights: Vec<_> = providers.iter().map(|(_, weight)| weight.value()).collect();
+        let weights: Vec<_> = providers
+            .iter()
+            .map(|(_, weight)| weight.value())
+            .map(|w| w.min(1))
+            .collect();
         let non_zero_weight_providers = weights.iter().filter(|&x| *x > 0).count();
         let keys = providers.keys().cloned().collect::<Vec<_>>();
 
@@ -387,16 +475,21 @@ pub enum ProviderKind {
     Infura,
     Pokt,
     Binance,
+    Berachain,
+    Bungee,
     ZKSync,
     Publicnode,
     Base,
     Zora,
     Zerion,
     Coinbase,
+    OneInch,
     Quicknode,
     Near,
     Mantle,
     GetBlock,
+    SolScan,
+    Unichain,
 }
 
 impl Display for ProviderKind {
@@ -409,16 +502,21 @@ impl Display for ProviderKind {
                 ProviderKind::Infura => "Infura",
                 ProviderKind::Pokt => "Pokt",
                 ProviderKind::Binance => "Binance",
+                ProviderKind::Berachain => "Berachain",
+                ProviderKind::Bungee => "Bungee",
                 ProviderKind::ZKSync => "zkSync",
                 ProviderKind::Publicnode => "Publicnode",
                 ProviderKind::Base => "Base",
                 ProviderKind::Zora => "Zora",
                 ProviderKind::Zerion => "Zerion",
                 ProviderKind::Coinbase => "Coinbase",
+                ProviderKind::OneInch => "OneInch",
                 ProviderKind::Quicknode => "Quicknode",
                 ProviderKind::Near => "Near",
                 ProviderKind::Mantle => "Mantle",
                 ProviderKind::GetBlock => "GetBlock",
+                ProviderKind::SolScan => "SolScan",
+                ProviderKind::Unichain => "Unichain",
             }
         )
     }
@@ -432,16 +530,21 @@ impl ProviderKind {
             "Infura" => Some(Self::Infura),
             "Pokt" => Some(Self::Pokt),
             "Binance" => Some(Self::Binance),
+            "Berachain" => Some(Self::Berachain),
+            "Bungee" => Some(Self::Bungee),
             "zkSync" => Some(Self::ZKSync),
             "Publicnode" => Some(Self::Publicnode),
             "Base" => Some(Self::Base),
             "Zora" => Some(Self::Zora),
             "Zerion" => Some(Self::Zerion),
             "Coinbase" => Some(Self::Coinbase),
+            "OneInch" => Some(Self::OneInch),
             "Quicknode" => Some(Self::Quicknode),
             "Near" => Some(Self::Near),
             "Mantle" => Some(Self::Mantle),
             "GetBlock" => Some(Self::GetBlock),
+            "SolScan" => Some(Self::SolScan),
+            "Unichain" => Some(Self::Unichain),
             _ => None,
         }
     }
@@ -563,12 +666,12 @@ pub trait RateLimited {
 }
 
 #[async_trait]
-pub trait HistoryProvider: Send + Sync + Debug {
+pub trait HistoryProvider: Send + Sync {
     async fn get_transactions(
         &self,
         address: String,
         params: HistoryQueryParams,
-        http_client: reqwest::Client,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<HistoryResponseBody>;
 }
 
@@ -577,8 +680,8 @@ pub trait PortfolioProvider: Send + Sync + Debug {
     async fn get_portfolio(
         &self,
         address: String,
-        body: hyper::body::Bytes,
         params: PortfolioQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<PortfolioResponseBody>;
 }
 
@@ -587,63 +690,138 @@ pub trait OnRampProvider: Send + Sync + Debug {
     async fn get_buy_options(
         &self,
         params: OnRampBuyOptionsParams,
-        http_client: reqwest::Client,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<OnRampBuyOptionsResponse>;
 
     async fn get_buy_quotes(
         &self,
         params: OnRampBuyQuotesParams,
-        http_client: reqwest::Client,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<OnRampBuyQuotesResponse>;
 }
 
 #[async_trait]
-pub trait BalanceProvider: Send + Sync + Debug {
+pub trait BalanceProvider: Send + Sync {
     async fn get_balance(
         &self,
         address: String,
         params: BalanceQueryParams,
-        http_client: reqwest::Client,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<BalanceResponseBody>;
 }
 
 #[async_trait]
-pub trait FungiblePriceProvider: Send + Sync + Debug {
+pub trait FungiblePriceProvider: Send + Sync {
     async fn get_price(
         &self,
         chain_id: &str,
         address: &str,
         currency: &SupportedCurrencies,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<PriceResponseBody>;
 }
 
 #[async_trait]
-pub trait ConversionProvider: Send + Sync + Debug {
+pub trait ConversionProvider: Send + Sync {
     async fn get_tokens_list(
         &self,
         params: TokensListQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<TokensListResponseBody>;
 
     async fn get_convert_quote(
         &self,
         params: ConvertQuoteQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<ConvertQuoteResponseBody>;
 
     async fn build_approve_tx(
         &self,
         params: ConvertApproveQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<ConvertApproveResponseBody>;
 
     async fn build_convert_tx(
         &self,
         params: ConvertTransactionQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<ConvertTransactionResponseBody>;
 
     async fn get_gas_price(
         &self,
         params: GasPriceQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<GasPriceQueryResponseBody>;
 
-    async fn get_allowance(&self, params: AllowanceQueryParams)
-        -> RpcResult<AllowanceResponseBody>;
+    async fn get_allowance(
+        &self,
+        params: AllowanceQueryParams,
+        metrics: Arc<Metrics>,
+    ) -> RpcResult<AllowanceResponseBody>;
+}
+
+/// List of supported bundler operations
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
+pub enum SupportedBundlerOps {
+    #[serde(rename = "eth_getUserOperationReceipt")]
+    EthGetUserOperationReceipt,
+    #[serde(rename = "eth_sendUserOperation")]
+    EthSendUserOperation,
+    #[serde(rename = "eth_estimateUserOperationGas")]
+    EthEstimateUserOperationGas,
+    /// Paymaster sponsor UserOp
+    #[serde(rename = "pm_sponsorUserOperation")]
+    PmSponsorUserOperation,
+    #[serde(rename = "pimlico_getUserOperationGasPrice")]
+    PimlicoGetUserOperationGasPrice,
+}
+
+/// Provider for the bundler operations
+#[async_trait]
+pub trait BundlerOpsProvider: Send + Sync + Debug {
+    /// Send JSON-RPC request to the bundler
+    async fn bundler_rpc_call(
+        &self,
+        chain_id: &str,
+        id: Id,
+        jsonrpc: Arc<str>,
+        method: &SupportedBundlerOps,
+        params: serde_json::Value,
+    ) -> RpcResult<serde_json::Value>;
+
+    /// Maps the operations enum variant to its provider-specific operation string.
+    fn to_provider_op(&self, op: &SupportedBundlerOps) -> String;
+}
+
+/// Provider for the chain orchestrator operations
+#[async_trait]
+pub trait ChainOrchestrationProvider: Send + Sync + Debug {
+    async fn get_bridging_quotes(
+        &self,
+        from_chain_id: String,
+        from_token_address: Address,
+        to_chain_id: String,
+        to_token_address: Address,
+        amount: U256,
+        user_address: Address,
+    ) -> Result<Vec<Value>, RpcError>;
+
+    async fn build_bridging_tx(&self, route: Value) -> Result<bungee::BungeeBuildTx, RpcError>;
+
+    async fn check_allowance(
+        &self,
+        chain_id: String,
+        owner: Address,
+        target: Address,
+        token_address: Address,
+    ) -> Result<U256, RpcError>;
+
+    async fn build_approval_tx(
+        &self,
+        chain_id: String,
+        owner: Address,
+        target: Address,
+        token_address: Address,
+        amount: U256,
+    ) -> Result<bungee::BungeeApprovalTx, RpcError>;
 }

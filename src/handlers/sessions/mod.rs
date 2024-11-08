@@ -1,36 +1,83 @@
-use serde::{Deserialize, Serialize};
+use {
+    crate::utils::crypto::UserOperation,
+    alloy::primitives::Bytes,
+    serde::{Deserialize, Serialize},
+    serde_json::Value,
+};
 
+pub mod context;
+pub mod cosign;
 pub mod create;
 pub mod get;
 pub mod list;
+pub mod revoke;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryParams {
+    pub project_id: String,
+}
 
 /// Payload to create a new permission
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NewPermissionPayload {
-    pub permission: PermissionItem,
+    pub expiry: usize,
+    pub signer: PermissionTypeData,
+    pub permissions: Vec<PermissionTypeData>,
+    pub policies: Vec<PermissionTypeData>,
 }
 
-// Payload to get permission by PCI
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GetPermissionsRequest {
-    address: String,
-    pci: String,
+pub struct PermissionTypeData {
+    pub r#type: String,
+    pub data: Value,
 }
 
-/// Permission item schema
+/// Permissions Context item schema
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PermissionItem {
-    permission_type: String,
-    data: String,
-    required: bool,
-    on_chain_validated: bool,
+pub struct ActivatePermissionPayload {
+    pub pci: String,
+    pub expiry: usize,
+    pub signer: PermissionTypeData,
+    pub permissions: Vec<PermissionTypeData>,
+    pub policies: Vec<PermissionTypeData>,
+    pub context: Bytes,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionSubContextSignerData {
+    user_op_builder: String,
 }
 
 /// Serialized permission item schema to store it in the IRN database
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoragePermissionsItem {
-    permissions: PermissionItem,
+    expiry: usize,
+    created_at: usize,
+    project_id: String,
+    signer: PermissionTypeData,
+    permissions: Vec<PermissionTypeData>,
+    policies: Vec<PermissionTypeData>,
+    context: Option<Bytes>,
     verification_key: String,
+    signing_key: String,
+    revoked_at: Option<usize>,
+}
+
+/// Permission revoke request schema
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionRevokeRequest {
+    pci: String,
+}
+
+/// Co-sign request schema
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoSignRequest {
+    pub pci: String,
+    pub user_op: UserOperation,
 }

@@ -66,6 +66,11 @@ pub enum MessageSource {
     ProfileAddressSigValidate,
     ProfileAttributesSigValidate,
     ProfileRegisterSigValidate,
+    SessionCoSignSigValidate,
+    WalletPrepareCalls,
+    WalletSendPreparedCalls,
+    WalletGetCallsStatus,
+    ChainAgnosticCheck,
 }
 
 #[cfg(test)]
@@ -91,6 +96,12 @@ mod tests {
 
         let source = MessageSource::ProfileRegisterSigValidate;
         assert_eq!(source.to_string(), "profile_register_sig_validate");
+
+        let source = MessageSource::SessionCoSignSigValidate;
+        assert_eq!(source.to_string(), "session_co_sign_sig_validate");
+
+        let source = MessageSource::ChainAgnosticCheck;
+        assert_eq!(source.to_string(), "chain_agnostic_check");
     }
 
     #[test]

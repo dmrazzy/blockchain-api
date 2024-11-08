@@ -1,6 +1,9 @@
 use {
     crate::{
-        project::ProjectDataError, storage::error::StorageError, utils::crypto::CryptoUitlsError,
+        handlers::sessions::get::InternalGetSessionContextError,
+        project::ProjectDataError,
+        storage::error::StorageError,
+        utils::crypto::{CaipNamespaces, CryptoUitlsError},
     },
     axum::{response::IntoResponse, Json},
     cerberus::registry::RegistryError,
@@ -36,17 +39,29 @@ pub enum RpcError {
     #[error("Transport error: {0}")]
     TransportError(#[from] hyper::Error),
 
+    #[error("Proxy timeout error: {0}")]
+    ProxyTimeoutError(tokio::time::error::Elapsed),
+
     #[error("Request::builder() failed: {0}")]
     RequestBuilderError(#[from] hyper::http::Error),
 
     #[error("Specified chain is not supported by any of the providers: {0}")]
     UnsupportedChain(String),
 
+    #[error("Specified currency is not supported: {0}")]
+    UnsupportedCurrency(String),
+
     #[error("Requested chain provider is temporarily unavailable: {0}")]
     ChainTemporarilyUnavailable(String),
 
+    #[error("Invalid chainId format for the requested namespace: {0}")]
+    InvalidChainIdFormat(String),
+
     #[error("Specified provider is not supported: {0}")]
     UnsupportedProvider(String),
+
+    #[error("Specified bundler is not supported: {0}")]
+    UnsupportedBundler(String),
 
     #[error("Failed to reach the provider")]
     ProviderError,
@@ -60,8 +75,8 @@ pub enum RpcError {
     #[error("Failed to reach the balance provider")]
     BalanceProviderError,
 
-    #[error("Failed to reach the fungible price provider")]
-    FungiblePriceProviderError,
+    #[error("Failed to reach the fungible price provider: {0}")]
+    FungiblePriceProviderError(String),
 
     #[error("Failed to parse balance provider url")]
     BalanceParseURLError,
@@ -131,6 +146,9 @@ pub enum RpcError {
     #[error("Name is not registered: {0}")]
     NameNotRegistered(String),
 
+    #[error("Name registeration error: {0}")]
+    NameRegistrationError(String),
+
     #[error("Name is not found: {0}")]
     NameNotFound(String),
 
@@ -149,8 +167,14 @@ pub enum RpcError {
     #[error("Name is not in the allowed zones: {0}")]
     InvalidNameZone(String),
 
+    #[error("Invalid value: {0}")]
+    InvalidValue(String),
+
     #[error("Unsupported coin type: {0}")]
     UnsupportedCoinType(u32),
+
+    #[error("Unsupported namespace: {0}")]
+    UnsupportedNamespace(CaipNamespaces),
 
     #[error("Unsupported name attribute")]
     UnsupportedNameAttribute,
@@ -173,8 +197,59 @@ pub enum RpcError {
     #[error("IRN client is not configured")]
     IrnNotConfigured,
 
-    #[error("Permission for PCI is not found: {0}")]
-    PermissionNotFound(String),
+    #[error("Internal permissions get context error: {0}")]
+    InternalGetSessionContextError(InternalGetSessionContextError),
+
+    #[error("Wrong Base64 format: {0}")]
+    WrongBase64Format(String),
+
+    #[error("Wrong Hex format: {0}")]
+    WrongHexFormat(String),
+
+    #[error("Key format error: {0}")]
+    KeyFormatError(String),
+
+    #[error("Signature format error: {0}")]
+    SignatureFormatError(String),
+
+    #[error("Pkcs8 error: {0}")]
+    Pkcs8Error(#[from] ethers::core::k256::pkcs8::Error),
+
+    #[error("Permission for PCI is not found: {0} {1}")]
+    PermissionNotFound(String, String),
+
+    #[error("Permission context was not updated yet: {0}")]
+    PermissionContextNotUpdated(String),
+
+    #[error("Permission is revoked: {0}")]
+    RevokedPermission(String),
+
+    #[error("Permission is expired: {0}")]
+    PermissionExpired(String),
+
+    #[error("Permissions set is empty")]
+    CoSignerEmptyPermissions,
+
+    #[error("Cosigner permission denied: {0}")]
+    CosignerPermissionDenied(String),
+
+    #[error("Cosigner unsupported permission: {0}")]
+    CosignerUnsupportedPermission(String),
+
+    #[error("ABI decoding error: {0}")]
+    AbiDecodingError(String),
+
+    #[error("No bridging needed")]
+    NoBridgingNeeded,
+
+    #[error("No bridging available")]
+    NoBridgingAvailable,
+
+    #[error("No routes available for the bridging")]
+    NoBridgingRoutesAvailable,
+
+    #[error("Orchestration ID is not found: {0}")]
+    OrchestrationIdNotFound(String),
 }
 
 impl IntoResponse for RpcError {
@@ -189,11 +264,19 @@ impl IntoResponse for RpcError {
                 )),
             )
                 .into_response(),
+            Self::UnsupportedCurrency(error_message) => (
+                    StatusCode::BAD_REQUEST,
+                    Json(new_error_response(
+                        "currency".to_string(),
+                        format!("Unsupported currency: {error_message}."),
+                    )),
+                )
+                    .into_response(),
             Self::CryptoUitlsError(e) => (
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
                     "".to_string(),
-                    format!("Crypto utils invalid argument: {}", e),
+                    format!("Crypto utils error: {}", e),
                 )),
             )
                 .into_response(),
@@ -205,11 +288,27 @@ impl IntoResponse for RpcError {
                 )),
             )
                 .into_response(),
+            Self::InvalidChainIdFormat(chain_id) => (
+                    StatusCode::BAD_REQUEST,
+                    Json(new_error_response(
+                        "chainId".to_string(),
+                        format!("Requested {chain_id} has invalid format for the requested namespace"),
+                    )),
+                )
+                    .into_response(),
             Self::UnsupportedProvider(provider) => (
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
                     "provider".to_string(),
                     format!("Provider {provider} is not supported"),
+                )),
+            )
+                .into_response(),
+            Self::UnsupportedBundler(bundler) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "bundler".to_string(),
+                    format!("Bundler {bundler} is not supported"),
                 )),
             )
                 .into_response(),
@@ -311,6 +410,14 @@ impl IntoResponse for RpcError {
                 )),
             )
                 .into_response(),
+                Self::UnsupportedNamespace(e) => (
+                    StatusCode::BAD_REQUEST,
+                    Json(new_error_response(
+                        "address".to_string(),
+                        format!("Unsupported namespace: {}", e),
+                    )),
+                )
+                    .into_response(),
             Self::UnsupportedNameAttribute => (
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
@@ -391,15 +498,174 @@ impl IntoResponse for RpcError {
                 )),
             )
                 .into_response(),
-            Self::PermissionNotFound(e) => (
+            Self::PermissionNotFound(address, pci) => {
+                // TODO: Remove this debug log
+                print!(
+                    "Permission not found with PCI: {:?} and address: {:?}",
+                    pci,
+                    address
+                );
+                (
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
                     "pci".to_string(),
-                    format!("Permission for PCI is not found: {}", e),
+                    format!("Permission for PCI is not found: {}", pci),
+                )),
+            )
+                .into_response()
+            },
+            Self::RevokedPermission(pci) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "pci".to_string(),
+                    format!("Permission is revoked: {}", pci),
                 )),
             )
                 .into_response(),
-
+            Self::PermissionExpired(pci) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "pci".to_string(),
+                    format!("Permission is expired: {}", pci),
+                )),
+            )
+                .into_response(),
+            Self::WrongBase64Format(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "".to_string(),
+                    format!("Wrong Base64 format: {}", e),
+                )),
+            )
+                .into_response(),
+            Self::KeyFormatError(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "key".to_string(),
+                    format!("Invalid key format: {}", e),
+                )),
+            )
+                .into_response(),
+            Self::SignatureFormatError(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "signature".to_string(),
+                    format!("Invalid signature format: {}", e),
+                )),
+            )
+                .into_response(),
+            Self::CoSignerEmptyPermissions => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "".to_string(),
+                    "Permissions set is empty".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::AbiDecodingError(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "calldata".to_string(),
+                    format!("ABI signature decoding error: {}", e),
+                )),
+            )
+                .into_response(),
+            Self::TransactionProviderError => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(new_error_response(
+                    "".to_string(),
+                    "Transaction provider is temporarily unavailable".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::OnRampProviderError => (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(new_error_response(
+                        "".to_string(),
+                        "OnRamp provider is temporarily unavailable".to_string(),
+                    )),
+                )
+                    .into_response(),
+            Self::PortfolioProviderError => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(new_error_response(
+                    "".to_string(),
+                    "Portfolio provider is temporarily unavailable".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::BalanceProviderError => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(new_error_response(
+                    "".to_string(),
+                    "Balance provider is temporarily unavailable".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::FungiblePriceProviderError(e) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(new_error_response(
+                    "".to_string(),
+                    format!("Fungibles price provider is temporarily unavailable: {}", e),
+                )),
+            )
+                .into_response(),
+            Self::ConversionProviderError => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(new_error_response(
+                    "".to_string(),
+                    "Convertion provider is temporarily unavailable".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::CosignerPermissionDenied(e) => (
+                    StatusCode::UNAUTHORIZED,
+                    Json(new_error_response(
+                        "".to_string(),
+                        format!("Cosigner permission denied: {}", e),
+                    )),
+                )
+                    .into_response(),
+            Self::CosignerUnsupportedPermission(e) => (
+                StatusCode::UNAUTHORIZED,
+                Json(new_error_response(
+                    "".to_string(),
+                    format!("Unsupported permission in CoSigner: {}", e),
+                )),
+            )
+                .into_response(),
+            Self::NoBridgingNeeded => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "".to_string(),
+                    "No bridging needed".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::NoBridgingAvailable => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "".to_string(),
+                    "No bridging available".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::NoBridgingRoutesAvailable => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "".to_string(),
+                    "No bridging routes available".to_string(),
+                )),
+            )
+                .into_response(),
+            Self::OrchestrationIdNotFound(id) => (
+                StatusCode::BAD_REQUEST,
+                Json(new_error_response(
+                    "orchestrationId".to_string(),
+                    format!("Orchestration ID is not found: {}", id),
+                )),
+            )
+                .into_response(),
             // Any other errors considering as 500
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,

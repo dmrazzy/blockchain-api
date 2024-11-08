@@ -19,12 +19,13 @@ use {
             fungible_price::FungiblePriceItem,
             SupportedCurrencies,
         },
-        providers::{ConversionProvider, FungiblePriceProvider, PriceResponseBody},
+        providers::{ConversionProvider, FungiblePriceProvider, PriceResponseBody, ProviderKind},
         utils::crypto,
+        Metrics,
     },
     async_trait::async_trait,
     serde::Deserialize,
-    std::collections::HashMap,
+    std::{collections::HashMap, sync::Arc, time::SystemTime},
     tracing::log::error,
     url::Url,
 };
@@ -33,6 +34,7 @@ const ONEINCH_FEE: f64 = 0.85;
 
 #[derive(Debug)]
 pub struct OneInchProvider {
+    pub provider_kind: ProviderKind,
     pub api_key: String,
     pub referrer: Option<String>,
     pub base_api_url: String,
@@ -44,6 +46,7 @@ impl OneInchProvider {
         let base_api_url = "https://api.1inch.dev".to_string();
         let http_client = reqwest::Client::new();
         Self {
+            provider_kind: ProviderKind::OneInch,
             api_key,
             referrer,
             base_api_url,
@@ -51,14 +54,9 @@ impl OneInchProvider {
         }
     }
 
-    async fn send_request(
-        &self,
-        url: Url,
-        http_client: &reqwest::Client,
-    ) -> Result<reqwest::Response, reqwest::Error> {
-        http_client
+    async fn send_request(&self, url: Url) -> Result<reqwest::Response, reqwest::Error> {
+        self.http_client
             .get(url)
-            .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", self.api_key))
             .send()
             .await
@@ -69,6 +67,7 @@ impl OneInchProvider {
         chain_id: &str,
         address: &str,
         currency: &SupportedCurrencies,
+        metrics: Arc<Metrics>,
     ) -> Result<String, RpcError> {
         let address = address.to_lowercase();
         let mut url = Url::parse(
@@ -78,21 +77,38 @@ impl OneInchProvider {
         url.query_pairs_mut()
             .append_pair("currency", &currency.to_string());
 
-        let price_response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let price_response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            price_response.status().into(),
+            latency_start,
+            Some(chain_id.to_string()),
+            Some("price".to_string()),
+        );
 
         if !price_response.status().is_success() {
+            // Passing through error description for the error context
+            // if user parameter is invalid (got 400 status code from the provider)
+            if price_response.status() == reqwest::StatusCode::BAD_REQUEST {
+                let response_error = match price_response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
+            }
+
             error!(
                 "Error on getting fungible price from 1inch provider. Status is not OK: {:?}",
                 price_response.status(),
             );
-            // Passing through error description for the error context
-            // if user parameter is invalid (got 400 status code from the provider)
-            if price_response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = price_response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
-            }
             return Err(RpcError::ConversionProviderError);
         }
         let price_body = price_response.json::<HashMap<String, String>>().await?;
@@ -112,6 +128,7 @@ impl OneInchProvider {
         &self,
         chain_id: &str,
         address: &str,
+        metrics: Arc<Metrics>,
     ) -> Result<OneInchTokenItem, RpcError> {
         let address = address.to_lowercase();
         let url = Url::parse(
@@ -123,21 +140,38 @@ impl OneInchProvider {
         )
         .map_err(|_| RpcError::ConversionParseURLError)?;
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(chain_id.to_string()),
+            Some("custom_token_info".to_string()),
+        );
 
         if !response.status().is_success() {
+            // Passing through error description for the error context
+            // if user parameter is invalid (got 400 status code from the provider)
+            if response.status() == reqwest::StatusCode::BAD_REQUEST {
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
+            }
+
             error!(
                 "Error on getting token info from 1inch provider. Status is not OK: {:?}",
                 response.status(),
             );
-            // Passing through error description for the error context
-            // if user parameter is invalid (got 400 status code from the provider)
-            if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
-            }
             return Err(RpcError::ConversionProviderError);
         }
         let body = response.json::<OneInchTokenItem>().await?;
@@ -196,15 +230,8 @@ struct OneInchTxTransaction {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OneInchErrorResponse {
-    error: OneInchErrorItem,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct OneInchErrorItem {
     description: String,
 }
-
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum OneInchGasPriceResponse {
@@ -245,6 +272,7 @@ impl ConversionProvider for OneInchProvider {
     async fn get_tokens_list(
         &self,
         params: TokensListQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<TokensListResponseBody> {
         let evm_chain_id = crypto::disassemble_caip2(&params.chain_id)?.1;
         let base = format!(
@@ -254,16 +282,32 @@ impl ConversionProvider for OneInchProvider {
         );
         let url = Url::parse(&base).map_err(|_| RpcError::ConversionParseURLError)?;
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(evm_chain_id.to_string()),
+            Some("tokens_list".to_string()),
+        );
 
         if !response.status().is_success() {
             // Passing through error description for the error context
             // if user parameter is invalid (got 400 status code from the provider)
             if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
             }
             // 404 response is expected when the chain ID is not supported
             if response.status() == reqwest::StatusCode::NOT_FOUND {
@@ -319,6 +363,7 @@ impl ConversionProvider for OneInchProvider {
     async fn get_convert_quote(
         &self,
         params: ConvertQuoteQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<ConvertQuoteResponseBody> {
         let (_, chain_id, src_address) = crypto::disassemble_caip10(&params.from)?;
         let (_, dst_chain_id, dst_address) = crypto::disassemble_caip10(&params.to)?;
@@ -352,22 +397,39 @@ impl ConversionProvider for OneInchProvider {
             url.query_pairs_mut().append_pair("gasPrice", gas_price);
         }
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(chain_id.to_string()),
+            Some("quote".to_string()),
+        );
 
-        if !response.status().is_success() {
+        let response_status = response.status();
+        if !response_status.is_success() {
             // Passing through error description for the error context
             // if user parameter is invalid (got 400 status code from the provider)
             if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
             }
 
             error!(
                 "Error on getting quotes for conversion from 1inch provider. Status is not OK: \
                  {:?}",
-                response.status(),
+                response_status,
             );
             return Err(RpcError::ConversionProviderError);
         }
@@ -390,6 +452,7 @@ impl ConversionProvider for OneInchProvider {
     async fn build_approve_tx(
         &self,
         params: ConvertApproveQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<ConvertApproveResponseBody> {
         let chain_id = crypto::disassemble_caip10(&params.from)?.1;
         let (_, dst_chain_id, dst_address) = crypto::disassemble_caip10(&params.to)?;
@@ -414,16 +477,32 @@ impl ConversionProvider for OneInchProvider {
             url.query_pairs_mut().append_pair("amount", amount);
         }
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(chain_id.to_string()),
+            Some("approve_transactions".to_string()),
+        );
 
         if !response.status().is_success() {
             // Passing through error description for the error context
             // if user parameter is invalid (got 400 status code from the provider)
             if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
             }
 
             error!(
@@ -454,6 +533,7 @@ impl ConversionProvider for OneInchProvider {
     async fn build_convert_tx(
         &self,
         params: ConvertTransactionQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<ConvertTransactionResponseBody> {
         let (_, chain_id, src_address) = crypto::disassemble_caip10(&params.from)?;
         let (_, dst_chain_id, dst_address) = crypto::disassemble_caip10(&params.to)?;
@@ -495,15 +575,32 @@ impl ConversionProvider for OneInchProvider {
             ));
         }
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(chain_id.to_string()),
+            Some("swap".to_string()),
+        );
+
         if !response.status().is_success() {
             // Passing through error description for the error context
             // if user parameter is invalid (got 400 status code from the provider)
             if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
             }
 
             error!(
@@ -542,6 +639,7 @@ impl ConversionProvider for OneInchProvider {
     async fn get_gas_price(
         &self,
         params: GasPriceQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<GasPriceQueryResponseBody> {
         let evm_chain_id = crypto::disassemble_caip2(&params.chain_id)?.1;
         let base = format!(
@@ -551,22 +649,39 @@ impl ConversionProvider for OneInchProvider {
         );
         let url = Url::parse(&base).map_err(|_| RpcError::ConversionParseURLError)?;
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(evm_chain_id.to_string()),
+            Some("gas_price".to_string()),
+        );
 
         if !response.status().is_success() {
+            // Passing through error description for the error context
+            // if user parameter is invalid (got 400 status code from the provider)
+            if response.status() == reqwest::StatusCode::BAD_REQUEST {
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
+            }
+
             error!(
                 "Error on getting gas price for conversion from 1inch provider. Status is not OK: \
                  {:?}",
                 response.status(),
             );
-            // Passing through error description for the error context
-            // if user parameter is invalid (got 400 status code from the provider)
-            if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
-            }
             return Err(RpcError::ConversionProviderError);
         }
         let body = response.json::<OneInchGasPriceResponse>().await?;
@@ -589,6 +704,7 @@ impl ConversionProvider for OneInchProvider {
     async fn get_allowance(
         &self,
         params: AllowanceQueryParams,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<AllowanceResponseBody> {
         let (_, evm_chain_id, token_address) = crypto::disassemble_caip10(&params.token_address)?;
         let wallet_address = crypto::disassemble_caip10(&params.user_address)?.2;
@@ -603,22 +719,39 @@ impl ConversionProvider for OneInchProvider {
         url.query_pairs_mut()
             .append_pair("walletAddress", &wallet_address.to_lowercase());
 
-        let response = self.send_request(url, &self.http_client.clone()).await?;
+        let latency_start = SystemTime::now();
+        let response = self.send_request(url).await?;
+        metrics.add_latency_and_status_code_for_provider(
+            self.provider_kind,
+            response.status().into(),
+            latency_start,
+            Some(evm_chain_id.to_string()),
+            Some("allowance".to_string()),
+        );
 
         if !response.status().is_success() {
+            // Passing through error description for the error context
+            // if user parameter is invalid (got 400 status code from the provider)
+            if response.status() == reqwest::StatusCode::BAD_REQUEST {
+                let response_error = match response.json::<OneInchErrorResponse>().await {
+                    Ok(response_error) => response_error.description,
+                    Err(e) => {
+                        error!(
+                            "Error parsing OneInch HTTP 400 Bad Request error response {:?}",
+                            e
+                        );
+                        // Respond to the client with a generic error message and HTTP 400 anyway
+                        "Invalid parameter".to_string()
+                    }
+                };
+                return Err(RpcError::ConversionInvalidParameter(response_error));
+            }
+
             error!(
                 "Error on getting allowance for conversion from 1inch provider. Status is not OK: \
                  {:?}",
                 response.status(),
             );
-            // Passing through error description for the error context
-            // if user parameter is invalid (got 400 status code from the provider)
-            if response.status() == reqwest::StatusCode::BAD_REQUEST {
-                let response_error = response.json::<OneInchErrorResponse>().await?;
-                return Err(RpcError::ConversionInvalidParameter(
-                    response_error.error.description,
-                ));
-            }
             return Err(RpcError::ConversionProviderError);
         }
         let body = response.json::<OneInchAllowanceResponse>().await?;
@@ -636,9 +769,12 @@ impl FungiblePriceProvider for OneInchProvider {
         chain_id: &str,
         address: &str,
         currency: &SupportedCurrencies,
+        metrics: Arc<Metrics>,
     ) -> RpcResult<PriceResponseBody> {
-        let price = self.get_token_price(chain_id, address, currency).await?;
-        let info = self.get_token_info(chain_id, address).await?;
+        let price = self
+            .get_token_price(chain_id, address, currency, metrics.clone())
+            .await?;
+        let info = self.get_token_info(chain_id, address, metrics).await?;
 
         let response = PriceResponseBody {
             fungibles: vec![FungiblePriceItem {

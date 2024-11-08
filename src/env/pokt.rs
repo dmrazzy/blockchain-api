@@ -79,11 +79,13 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             ),
         ),
         // Base Sepolia
+        // Todo: Temporary disabling Pokt for the Sepolia until the contract call
+        // flaky responses issue will be resolved.
         (
             "eip155:84532".into(),
             (
                 "base-testnet".into(),
-                Weight::new(Priority::Normal).unwrap(),
+                Weight::new(Priority::Disabled).unwrap(),
             ),
         ),
         // Binance Smart Chain
@@ -94,7 +96,12 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Ethereum mainnet
         (
             "eip155:1".into(),
-            ("eth-mainnet".into(), Weight::new(Priority::Max).unwrap()),
+            (
+                "eth-mainnet".into(),
+                // TODO: Temporary disabling Pokt for the mainnet until the issue
+                // with the flaky RPC response with the updated Alloy is resolved.
+                Weight::new(Priority::Disabled).unwrap(),
+            ),
         ),
         // Ethereum holesky
         (
@@ -170,6 +177,22 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "near:mainnet".into(),
             (
                 "near-mainnet".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        // Scroll
+        (
+            "eip155:534352".into(),
+            (
+                "scroll-mainnet".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        // Scroll sepolia testnet
+        (
+            "eip155:534351".into(),
+            (
+                "scroll-sepolia-testnet".into(),
                 Weight::new(Priority::Normal).unwrap(),
             ),
         ),
