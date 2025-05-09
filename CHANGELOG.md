@@ -2,6 +2,42 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.228.4 - 2025-05-09
+#### Bug Fixes
+- buy url (#1062) - (d6eb8f5) - Luka Isailovic
+#### Miscellaneous Chores
+- change the implementation to use string float instead of hex (#1061) - (7b871d9) - Luka Isailovic
+
+- - -
+
+## 0.228.3 - 2025-05-09
+#### Bug Fixes
+- nonce manager (#1053) - (356effd) - Chris Smith
+
+- - -
+
+## 0.228.2 - 2025-05-07
+#### Bug Fixes
+- coinbase transaction status (#1058) - (43c8a22) - Luka Isailovic
+
+- - -
+
+## 0.228.1 - 2025-05-07
+#### Bug Fixes
+- FAUCET_REQUEST_API_KEY env var (#1059) - (e435f80) - Chris Smith
+#### Miscellaneous Chores
+- pay merchant name (#1057) - (3ddbb2c) - Luka Isailovic
+
+- - -
+
+## 0.228.0 - 2025-05-06
+#### Features
+- **(providers)** removing Lava provider (#1055) - (0648cdd) - Max Kalashnikoff | maksy.eth
+#### Miscellaneous Chores
+- update monitoring-role TF module (#1054) - (5c84ab5) - daniel
+
+- - -
+
 ## 0.227.2 - 2025-05-01
 #### Bug Fixes
 - **(CI)** fixing rate-limiting test and enabling sessions and chain abstraction tests on staging (#1052) - (bd13e5d) - Max Kalashnikoff | maksy.eth

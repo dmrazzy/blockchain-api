@@ -61,18 +61,20 @@ impl GetExchangeUrlError {
 
 pub async fn handler(
     state: State<Arc<AppState>>,
+    project_id: String,
     connect_info: ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     query: Query<QueryParams>,
     Json(request): Json<GeneratePayUrlRequest>,
 ) -> Result<GeneratePayUrlResponse, GetExchangeUrlError> {
-    handler_internal(state, connect_info, headers, query, request)
+    handler_internal(state, project_id, connect_info, headers, query, request)
         .with_metrics(HANDLER_TASK_METRICS.with_name("pay_get_exchange_url"))
         .await
 }
 
 async fn handler_internal(
     state: State<Arc<AppState>>,
+    project_id: String,
     _connect_info: ConnectInfo<SocketAddr>,
     _headers: HeaderMap,
     _query: Query<QueryParams>,
@@ -109,14 +111,18 @@ async fn handler_internal(
         )));
     }
 
-    let amount = match usize::from_str_radix(request.amount.trim_start_matches("0x"), 16) {
-        Ok(amount) => amount,
-        Err(_) => {
-            return Err(GetExchangeUrlError::ValidationError(format!(
-                "Invalid amount. Expected a valid hexadecimal number: {}",
-                request.amount
-            )))
-        }
+    // support decimal and hex
+    let amount = match request.amount.parse::<f64>() {
+        Ok(parsed_amount) => parsed_amount,
+        Err(_) => match usize::from_str_radix(request.amount.trim_start_matches("0x"), 16) {
+            Ok(parsed_hex_amount) => parsed_hex_amount as f64,
+            Err(_) => {
+                return Err(GetExchangeUrlError::ValidationError(format!(
+                    "Invalid amount. Expected a valid number or hexadecimal string: {}",
+                    request.amount
+                )));
+            }
+        },
     };
 
     // Removing dashes from the session id because binance only accepts alphanumeric characters
@@ -126,6 +132,7 @@ async fn handler_internal(
         .get_buy_url(
             state,
             GetBuyUrlParams {
+                project_id,
                 asset,
                 amount,
                 recipient: address,
