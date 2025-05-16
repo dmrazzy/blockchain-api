@@ -8,13 +8,6 @@ variable "grafana_auth" {
   sensitive   = true
 }
 
-variable "sla_grafana_auth" {
-  description = "The API Token for the SLA Grafana instance"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
 #-------------------------------------------------------------------------------
 # Application
 
@@ -87,12 +80,6 @@ variable "project_cache_ttl" {
 #-------------------------------------------------------------------------------
 # Providers
 
-variable "infura_project_id" {
-  description = "The project ID for Infura"
-  type        = string
-  sensitive   = true
-}
-
 variable "pokt_project_id" {
   description = "The project ID for POKT"
   type        = string
@@ -135,12 +122,6 @@ variable "one_inch_referrer" {
   sensitive   = true
 }
 
-variable "getblock_access_tokens" {
-  description = "Mapping of API access tokens for GetBlock in JSON format"
-  type        = string
-  sensitive   = true
-}
-
 variable "pimlico_api_key" {
   description = "Pimlico bundler API token key"
   type        = string
@@ -155,12 +136,6 @@ variable "solscan_api_v2_token" {
 
 variable "bungee_api_key" {
   description = "Bungee API key"
-  type        = string
-  sensitive   = true
-}
-
-variable "lava_api_key" {
-  description = "Lava API key"
   type        = string
   sensitive   = true
 }

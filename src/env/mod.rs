@@ -16,10 +16,9 @@ use {
     std::{collections::HashMap, fmt::Display},
 };
 pub use {
-    allnodes::*, arbitrum::*, aurora::*, base::*, binance::*, drpc::*, dune::*, getblock::*,
-    infura::*, lava::*, mantle::*, monad::*, morph::*, near::*, odyssey::*, pokt::*, publicnode::*,
-    quicknode::*, server::*, solscan::*, syndica::*, unichain::*, wemix::*, zerion::*, zksync::*,
-    zora::*,
+    allnodes::*, arbitrum::*, aurora::*, base::*, binance::*, drpc::*, dune::*, mantle::*,
+    monad::*, morph::*, near::*, odyssey::*, pokt::*, publicnode::*, quicknode::*, server::*,
+    solscan::*, syndica::*, unichain::*, wemix::*, zerion::*, zksync::*, zora::*,
 };
 mod allnodes;
 mod arbitrum;
@@ -28,9 +27,6 @@ mod base;
 mod binance;
 mod drpc;
 mod dune;
-mod getblock;
-mod infura;
-mod lava;
 mod mantle;
 mod monad;
 mod morph;
@@ -179,7 +175,6 @@ mod test {
                 "RPC_PROXY_PROVIDER_CACHE_REDIS_ADDR",
                 "redis://127.0.0.1/providers_cache",
             ),
-            ("RPC_PROXY_PROVIDER_INFURA_PROJECT_ID", "INFURA_PROJECT_ID"),
             ("RPC_PROXY_PROVIDER_POKT_PROJECT_ID", "POKT_PROJECT_ID"),
             ("RPC_PROXY_PROVIDER_ZERION_API_KEY", "ZERION_API_KEY"),
             (
@@ -190,14 +185,12 @@ mod test {
             ("RPC_PROXY_PROVIDER_COINBASE_APP_ID", "COINBASE_APP_ID"),
             ("RPC_PROXY_PROVIDER_ONE_INCH_API_KEY", "ONE_INCH_API_KEY"),
             ("RPC_PROXY_PROVIDER_ONE_INCH_REFERRER", "ONE_INCH_REFERRER"),
-            ("RPC_PROXY_PROVIDER_GETBLOCK_ACCESS_TOKENS", "{}"),
             ("RPC_PROXY_PROVIDER_PIMLICO_API_KEY", "PIMLICO_API_KEY"),
             (
                 "RPC_PROXY_PROVIDER_SOLSCAN_API_V2_TOKEN",
                 "SOLSCAN_API_V2_TOKEN",
             ),
             ("RPC_PROXY_PROVIDER_BUNGEE_API_KEY", "BUNGEE_API_KEY"),
-            ("RPC_PROXY_PROVIDER_LAVA_API_KEY", "LAVA_API_KEY"),
             ("RPC_PROXY_PROVIDER_TENDERLY_API_KEY", "TENDERLY_KEY"),
             (
                 "RPC_PROXY_PROVIDER_TENDERLY_ACCOUNT_ID",
@@ -317,7 +310,6 @@ mod test {
                     prometheus_query_url: Some("PROMETHEUS_QUERY_URL".to_owned()),
                     prometheus_workspace_header: Some("PROMETHEUS_WORKSPACE_HEADER".to_owned()),
                     cache_redis_addr: Some("redis://127.0.0.1/providers_cache".to_owned()),
-                    infura_project_id: "INFURA_PROJECT_ID".to_string(),
                     pokt_project_id: "POKT_PROJECT_ID".to_string(),
                     quicknode_api_tokens: "QUICKNODE_API_TOKENS".to_string(),
                     zerion_api_key: "ZERION_API_KEY".to_owned(),
@@ -325,11 +317,9 @@ mod test {
                     coinbase_app_id: Some("COINBASE_APP_ID".to_owned()),
                     one_inch_api_key: Some("ONE_INCH_API_KEY".to_owned()),
                     one_inch_referrer: Some("ONE_INCH_REFERRER".to_owned()),
-                    getblock_access_tokens: Some("{}".to_owned()),
                     pimlico_api_key: "PIMLICO_API_KEY".to_string(),
                     solscan_api_v2_token: "SOLSCAN_API_V2_TOKEN".to_string(),
                     bungee_api_key: "BUNGEE_API_KEY".to_string(),
-                    lava_api_key: "LAVA_API_KEY".to_string(),
                     tenderly_api_key: "TENDERLY_KEY".to_string(),
                     tenderly_account_id: "TENDERLY_ACCOUNT_ID".to_string(),
                     tenderly_project_id: "TENDERLY_PROJECT_ID".to_string(),

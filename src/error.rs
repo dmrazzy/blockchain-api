@@ -108,7 +108,7 @@ pub enum RpcError {
     InvalidScheme,
 
     #[error(transparent)]
-    AxumTungstenite(#[from] axum_tungstenite::Error),
+    AxumTungstenite(Box<axum_tungstenite::Error>),
 
     #[error(transparent)]
     RateLimited(#[from] wc::rate_limit::RateLimitExceeded),
@@ -274,7 +274,7 @@ impl IntoResponse for RpcError {
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
                     "chainId".to_string(),
-                    format!("We don't support the chainId you provided: {chain_id}. See the list of supported chains here: https://docs.walletconnect.com/cloud/blockchain-api#supported-chains"),
+                    format!("We don't support the chainId you provided: {chain_id}. See the list of supported chains here: https://docs.reown.com/cloud/blockchain-api#supported-chains"),
                 )),
             )
                 .into_response(),

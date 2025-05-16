@@ -72,9 +72,6 @@ mod bungee;
 mod coinbase;
 mod drpc;
 mod dune;
-mod getblock;
-mod infura;
-mod lava;
 mod mantle;
 mod meld;
 pub mod mock_alto;
@@ -98,7 +95,7 @@ mod zksync;
 mod zora;
 
 pub use {
-    allnodes::AllnodesProvider,
+    allnodes::{AllnodesProvider, AllnodesWsProvider},
     arbitrum::ArbitrumProvider,
     aurora::AuroraProvider,
     base::BaseProvider,
@@ -106,9 +103,6 @@ pub use {
     bungee::BungeeProvider,
     drpc::DrpcProvider,
     dune::DuneProvider,
-    getblock::GetBlockProvider,
-    infura::{InfuraProvider, InfuraWsProvider},
-    lava::LavaProvider,
     mantle::MantleProvider,
     meld::MeldProvider,
     monad::MonadProvider,
@@ -143,7 +137,6 @@ pub struct ProvidersConfig {
     /// Redis address for provider's responses caching
     pub cache_redis_addr: Option<String>,
 
-    pub infura_project_id: String,
     pub pokt_project_id: String,
     pub quicknode_api_tokens: String,
 
@@ -152,16 +145,12 @@ pub struct ProvidersConfig {
     pub coinbase_app_id: Option<String>,
     pub one_inch_api_key: Option<String>,
     pub one_inch_referrer: Option<String>,
-    /// GetBlock provider access tokens in JSON format
-    pub getblock_access_tokens: Option<String>,
     /// Pimlico API token key
     pub pimlico_api_key: String,
     /// SolScan API v2 token key
     pub solscan_api_v2_token: String,
     /// Bungee API key
     pub bungee_api_key: String,
-    /// Lava API key
-    pub lava_api_key: String,
     /// Tenderly API key
     pub tenderly_api_key: String,
     /// Tenderly Account ID
@@ -668,7 +657,6 @@ impl ProviderRepository {
 pub enum ProviderKind {
     Aurora,
     Arbitrum,
-    Infura,
     Pokt,
     Binance,
     Bungee,
@@ -682,10 +670,8 @@ pub enum ProviderKind {
     Quicknode,
     Near,
     Mantle,
-    GetBlock,
     SolScan,
     Unichain,
-    Lava,
     Morph,
     Tenderly,
     Dune,
@@ -706,7 +692,6 @@ impl Display for ProviderKind {
             match self {
                 ProviderKind::Aurora => "Aurora",
                 ProviderKind::Arbitrum => "Arbitrum",
-                ProviderKind::Infura => "Infura",
                 ProviderKind::Pokt => "Pokt",
                 ProviderKind::Binance => "Binance",
                 ProviderKind::Wemix => "Wemix",
@@ -721,10 +706,8 @@ impl Display for ProviderKind {
                 ProviderKind::Quicknode => "Quicknode",
                 ProviderKind::Near => "Near",
                 ProviderKind::Mantle => "Mantle",
-                ProviderKind::GetBlock => "GetBlock",
                 ProviderKind::SolScan => "SolScan",
                 ProviderKind::Unichain => "Unichain",
-                ProviderKind::Lava => "Lava",
                 ProviderKind::Morph => "Morph",
                 ProviderKind::Tenderly => "Tenderly",
                 ProviderKind::Dune => "Dune",
@@ -745,7 +728,6 @@ impl ProviderKind {
         match s {
             "Aurora" => Some(Self::Aurora),
             "Arbitrum" => Some(Self::Arbitrum),
-            "Infura" => Some(Self::Infura),
             "Pokt" => Some(Self::Pokt),
             "Binance" => Some(Self::Binance),
             "Bungee" => Some(Self::Bungee),
@@ -759,10 +741,8 @@ impl ProviderKind {
             "Quicknode" => Some(Self::Quicknode),
             "Near" => Some(Self::Near),
             "Mantle" => Some(Self::Mantle),
-            "GetBlock" => Some(Self::GetBlock),
             "SolScan" => Some(Self::SolScan),
             "Unichain" => Some(Self::Unichain),
-            "Lava" => Some(Self::Lava),
             "Morph" => Some(Self::Morph),
             "Tenderly" => Some(Self::Tenderly),
             "Dune" => Some(Self::Dune),

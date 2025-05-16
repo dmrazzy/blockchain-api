@@ -86,7 +86,6 @@ resource "aws_ecs_task_definition" "app_task" {
 
         { name = "RPC_PROXY_BLOCKED_COUNTRIES", value = var.ofac_blocked_countries },
 
-        { name = "RPC_PROXY_PROVIDER_INFURA_PROJECT_ID", value = var.infura_project_id },
         { name = "RPC_PROXY_PROVIDER_POKT_PROJECT_ID", value = var.pokt_project_id },
         { name = "RPC_PROXY_PROVIDER_QUICKNODE_API_TOKENS", value = var.quicknode_api_tokens },
         { name = "RPC_PROXY_PROVIDER_ZERION_API_KEY", value = var.zerion_api_key },
@@ -94,11 +93,9 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "RPC_PROXY_PROVIDER_COINBASE_APP_ID", value = var.coinbase_app_id },
         { name = "RPC_PROXY_PROVIDER_ONE_INCH_API_KEY", value = var.one_inch_api_key },
         { name = "RPC_PROXY_PROVIDER_ONE_INCH_REFERRER", value = var.one_inch_referrer },
-        { name = "RPC_PROXY_PROVIDER_GETBLOCK_ACCESS_TOKENS", value = var.getblock_access_tokens },
         { name = "RPC_PROXY_PROVIDER_PIMLICO_API_KEY", value = var.pimlico_api_key },
         { name = "RPC_PROXY_PROVIDER_SOLSCAN_API_V2_TOKEN", value = var.solscan_api_v2_token },
         { name = "RPC_PROXY_PROVIDER_BUNGEE_API_KEY", value = var.bungee_api_key },
-        { name = "RPC_PROXY_PROVIDER_LAVA_API_KEY", value = var.lava_api_key },
         { name = "RPC_PROXY_PROVIDER_TENDERLY_API_KEY", value = var.tenderly_api_key },
         { name = "RPC_PROXY_PROVIDER_TENDERLY_ACCOUNT_ID", value = var.tenderly_account_id },
         { name = "RPC_PROXY_PROVIDER_TENDERLY_PROJECT_ID", value = var.tenderly_project_id },
