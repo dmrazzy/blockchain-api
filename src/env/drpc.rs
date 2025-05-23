@@ -48,7 +48,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:11155111".into(),
             (
                 "https://sepolia.drpc.org".into(),
-                Weight::new(Priority::Normal).unwrap(),
+                Weight::new(Priority::Minimal).unwrap(),
             ),
         ),
         // Ethereum Holesky
@@ -88,7 +88,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:56".into(),
             (
                 "https://bsc.drpc.org".into(),
-                Weight::new(Priority::Normal).unwrap(),
+                Weight::new(Priority::Minimal).unwrap(),
             ),
         ),
         // Polygon
@@ -96,7 +96,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:137".into(),
             (
                 "https://polygon.drpc.org".into(),
-                Weight::new(Priority::Normal).unwrap(),
+                Weight::new(Priority::Minimal).unwrap(),
             ),
         ),
         // Optimism
@@ -136,6 +136,22 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:10143".into(),
             (
                 "https://monad-testnet.drpc.org".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        // Sonic Mainnet
+        (
+            "eip155:146".into(),
+            (
+                "https://sonic.drpc.org".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        // Sonic Testnet
+        (
+            "eip155:57054".into(),
+            (
+                "https://sonic-testnet.drpc.org".into(),
                 Weight::new(Priority::Normal).unwrap(),
             ),
         ),

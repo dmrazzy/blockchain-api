@@ -2,6 +2,148 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.239.0 - 2025-05-23
+#### Features
+- handle custom bundler URL (#1076) - (e0e4989) - Chris Smith
+
+- - -
+
+## 0.238.0 - 2025-05-22
+#### Bug Fixes
+- **(tests)** disabling the USDT Arbitrum v1 CA tests (#1080) - (f55b8a9) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(providers)** decreasing BSC chain priority for the dRPC (#1081) - (ac309ec) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.237.0 - 2025-05-21
+#### Features
+- updating yttrium (#1079) - (a712a63) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.236.0 - 2025-05-21
+#### Features
+- **(providers)** adding Sui chain RPC support (#1078) - (969f0db) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.235.1 - 2025-05-20
+#### Bug Fixes
+- **(Meld)** proper handling of the bad request response (#1077) - (f11796f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.235.0 - 2025-05-19
+#### Features
+- **(RPC)** adding Solana RPC WebSocket support (#1073) - (da70416) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.234.0 - 2025-05-19
+#### Features
+- exchange projectid validation (#1075) - (b106c91) - Luka Isailovic
+
+- - -
+
+## 0.233.1 - 2025-05-16
+#### Bug Fixes
+- log bundler name in endpoint (#1074) - (60643f7) - Chris Smith
+
+- - -
+
+## 0.233.0 - 2025-05-16
+#### Features
+- enable more pairs for exchanges (#1072) - (30d39ff) - Luka Isailovic
+
+- - -
+
+## 0.232.1 - 2025-05-15
+#### Bug Fixes
+- changing domains from com to org and reown.com (#1067) - (8e3924f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.232.0 - 2025-05-15
+#### Features
+- **(providers)** removing GetBlock RPC provider (#1066) - (dd70090) - Max Kalashnikoff | maksy.eth
+- removing Grafana SLA workspace support (#1071) - (c63bf9d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.231.0 - 2025-05-14
+#### Features
+- ws provider fix (#1069) - (b7b59df) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.230.2 - 2025-05-14
+#### Bug Fixes
+- **(rpc)** using the Publicnode provider when session was provided (#1070) - (c193c90) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.230.1 - 2025-05-13
+#### Bug Fixes
+- **(terraform)** updating the RDS engine version (#1064) - (e328752) - Max Kalashnikoff | maksy.eth
+- coinbase transaction status (#1065) - (5346509) - Luka Isailovic
+
+- - -
+
+## 0.230.0 - 2025-05-13
+#### Features
+- **(providers)** removing Infura RPC provider (#1063) - (6b779e1) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.229.0 - 2025-05-12
+#### Features
+- **(chains)** adding Sonic Mainnet and Testnet RPC support (#1060) - (afb05ff) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.228.5 - 2025-05-12
+#### Bug Fixes
+- **(transactions)** adding a filtering by chainId (#1056) - (5408324) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.228.4 - 2025-05-09
+#### Bug Fixes
+- buy url (#1062) - (d6eb8f5) - Luka Isailovic
+#### Miscellaneous Chores
+- change the implementation to use string float instead of hex (#1061) - (7b871d9) - Luka Isailovic
+
+- - -
+
+## 0.228.3 - 2025-05-09
+#### Bug Fixes
+- nonce manager (#1053) - (356effd) - Chris Smith
+
+- - -
+
+## 0.228.2 - 2025-05-07
+#### Bug Fixes
+- coinbase transaction status (#1058) - (43c8a22) - Luka Isailovic
+
+- - -
+
+## 0.228.1 - 2025-05-07
+#### Bug Fixes
+- FAUCET_REQUEST_API_KEY env var (#1059) - (e435f80) - Chris Smith
+#### Miscellaneous Chores
+- pay merchant name (#1057) - (3ddbb2c) - Luka Isailovic
+
+- - -
+
+## 0.228.0 - 2025-05-06
+#### Features
+- **(providers)** removing Lava provider (#1055) - (0648cdd) - Max Kalashnikoff | maksy.eth
+#### Miscellaneous Chores
+- update monitoring-role TF module (#1054) - (5c84ab5) - daniel
+
+- - -
+
 ## 0.227.2 - 2025-05-01
 #### Bug Fixes
 - **(CI)** fixing rate-limiting test and enabling sessions and chain abstraction tests on staging (#1052) - (bd13e5d) - Max Kalashnikoff | maksy.eth

@@ -193,6 +193,27 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
                 Weight::new(Priority::Normal).unwrap(),
             ),
         ),
+        // Sonic Mainnet
+        (
+            "eip155:146".into(),
+            ("sonic-rpc".into(), Weight::new(Priority::Normal).unwrap()),
+        ),
+        // Optimism Sepolia
+        (
+            "eip155:11155420".into(),
+            (
+                "optimism-sepolia-rpc".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        // Sonic Testnet
+        (
+            "eip155:57054".into(),
+            (
+                "sonic-blaze-rpc".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
         // Bitcoin mainnet
         (
             "bip122:000000000019d6689c085ae165831e93".into(),
@@ -211,5 +232,19 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp".into(),
             ("solana-rpc".into(), Weight::new(Priority::Normal).unwrap()),
         ),
+        // Sui mainnet
+        (
+            "sui:mainnet".into(),
+            ("sui-rpc".into(), Weight::new(Priority::Normal).unwrap()),
+        ),
+        // Sui testnet
+        (
+            "sui:testnet".into(),
+            (
+                "sui-testnet-rpc".into(),
+                Weight::new(Priority::Normal).unwrap(),
+            ),
+        ),
+        //
     ])
 }

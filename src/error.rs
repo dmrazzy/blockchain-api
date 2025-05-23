@@ -108,7 +108,7 @@ pub enum RpcError {
     InvalidScheme,
 
     #[error(transparent)]
-    AxumTungstenite(#[from] axum_tungstenite::Error),
+    AxumTungstenite(Box<axum_tungstenite::Error>),
 
     #[error(transparent)]
     RateLimited(#[from] wc::rate_limit::RateLimitExceeded),
@@ -264,6 +264,12 @@ pub enum RpcError {
 
     #[error("Join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
+
+    #[error("Unsupported bundler name (URL parse error): {0}")]
+    UnsupportedBundlerNameUrlParseError(url::ParseError),
+
+    #[error("Unsupported bundler name: {0}")]
+    UnsupportedBundlerName(String),
 }
 
 impl IntoResponse for RpcError {
@@ -274,7 +280,7 @@ impl IntoResponse for RpcError {
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
                     "chainId".to_string(),
-                    format!("We don't support the chainId you provided: {chain_id}. See the list of supported chains here: https://docs.walletconnect.com/cloud/blockchain-api#supported-chains"),
+                    format!("We don't support the chainId you provided: {chain_id}. See the list of supported chains here: https://docs.reown.com/cloud/blockchain-api#supported-chains"),
                 )),
             )
                 .into_response(),
@@ -283,6 +289,22 @@ impl IntoResponse for RpcError {
                     Json(new_error_response(
                         "currency".to_string(),
                         format!("Unsupported currency: {error_message}."),
+                    )),
+                )
+                    .into_response(),
+            Self::UnsupportedBundlerName(error_message) => (
+                    StatusCode::BAD_REQUEST,
+                    Json(new_error_response(
+                        "bundler_name".to_string(),
+                        format!("Unsupported bundler name: {error_message}."),
+                    )),
+                )
+                    .into_response(),
+            Self::UnsupportedBundlerNameUrlParseError(error_message) => (
+                    StatusCode::BAD_REQUEST,
+                    Json(new_error_response(
+                        "bundler_name".to_string(),
+                        format!("Unsupported bundler name: {error_message}."),
                     )),
                 )
                     .into_response(),
