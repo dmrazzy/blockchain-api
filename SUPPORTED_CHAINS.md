@@ -14,6 +14,7 @@ Chain name with associated `chainId` query param to use.
 | Binance Smart Chain Testnet <sup>[1](#footnote1)</sup>   | eip155:97            |
 | Gnosis Chain                                             | eip155:100           |
 | Polygon                                                  | eip155:137           |
+| Sonic                                                    | eip155:146           |
 | zkSync Era Sepolia Testnet <sup>[1](#footnote1)</sup>    | eip155:300           |
 | zkSync Era                                               | eip155:324           |
 | Polygon Zkevm                                            | eip155:1101          |
@@ -33,6 +34,7 @@ Chain name with associated `chainId` query param to use.
 | Celo                                                     | eip155:42220         |
 | Avalanche Fuji Testnet <sup>[1](#footnote1)</sup>        | eip155:43113         |
 | Avalanche C-Chain                                        | eip155:43114         |
+| Sonic Testnet <sup>[1](#footnote1)</sup>                 | eip155:57054         |
 | Linea <sup>[1](#footnote1)</sup>                         | eip155:59144         |
 | Polygon Amoy <sup>[1](#footnote1)</sup>                  | eip155:80002         |
 | Berachain Bepolia <sup>[1](#footnote)</sup>              | eip155:80069         |
@@ -67,18 +69,41 @@ Chain name with associated `chainId` query param to use.
 | Bitcoin Mainnet                       | bip122:000000000019d6689c085ae165831e93 |
 | Bitcoin Testnet                       | bip122:000000000933ea01ad0ee984209779ba |
 
+### Sui
+
+| Network                               | Chain ID    |
+|---------------------------------------|-------------|
+| Sui Mainnet                           | sui:mainnet |
+| Sui Devnet                            | sui:devnet  |
+| Sui Testnet                           | sui:testnet |
+
+
+### Stacks
+
+*Important note:* The Stacks support is currently in a Beta. Endpoints and schema
+can be changed in a near future.
+
+| Network                                   | Chain ID          |
+|-------------------------------------------|-------------------|
+| Stacks Mainnet <sup>[1](#footnote1)</sup> | stacks:1          |
+| Stacks Testnet <sup>[1](#footnote1)</sup> | stacks:2147483648 |
+
 <a id="footnote1"><sup>1</sup></a> The availability of this chain in our RPC is not guaranteed.
 
 ## WebSocket RPC
 
 WebSocket RPC **is not recommended for production use**, and may be removed in the future.
 
+### Ethereum
+
 | Network            | Chain ID        |
 |--------------------|-----------------|
 | Ethereum           | eip155:1        |
-| Optimism           | eip155:10       |
-| Arbitrum           | eip155:42161    |
-| Arbitrum Sepolia   | eip155:421614   |
 | Zora               | eip155:7777777  |
-| Ethereum Sepolia   | eip155:11155111 |
-| Optimism Sepolia   | eip155:11155420 |
+
+### Solana
+
+| Network                               | Chain ID                                |
+|---------------------------------------|-----------------------------------------|
+| Solana Mainnet                        | solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp |
+| Solana Devnet                         | solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 |
