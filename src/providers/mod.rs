@@ -69,62 +69,70 @@ mod aurora;
 mod base;
 mod binance;
 mod bungee;
+mod callstatic;
 mod coinbase;
 mod drpc;
 mod dune;
-mod getblock;
-mod infura;
-mod lava;
+mod hiro;
 mod mantle;
 mod meld;
 pub mod mock_alto;
 mod monad;
+mod moonbeam;
 mod morph;
 mod near;
 mod odyssey;
 mod one_inch;
+mod onerpc;
 mod pimlico;
 mod pokt;
 mod publicnode;
 mod quicknode;
 mod solscan;
+mod sui;
 mod syndica;
 pub mod tenderly;
+mod therpc;
 mod unichain;
 mod weights;
 mod wemix;
+mod zan;
 pub mod zerion;
 mod zksync;
 mod zora;
 
 pub use {
-    allnodes::AllnodesProvider,
+    allnodes::{AllnodesProvider, AllnodesWsProvider},
     arbitrum::ArbitrumProvider,
     aurora::AuroraProvider,
     base::BaseProvider,
     binance::BinanceProvider,
     bungee::BungeeProvider,
+    callstatic::CallStaticProvider,
     drpc::DrpcProvider,
     dune::DuneProvider,
-    getblock::GetBlockProvider,
-    infura::{InfuraProvider, InfuraWsProvider},
-    lava::LavaProvider,
+    hiro::HiroProvider,
     mantle::MantleProvider,
     meld::MeldProvider,
     monad::MonadProvider,
+    moonbeam::MoonbeamProvider,
     morph::MorphProvider,
     near::NearProvider,
     odyssey::OdysseyProvider,
     one_inch::OneInchProvider,
+    onerpc::OneRpcProvider,
     pimlico::PimlicoProvider,
     pokt::PoktProvider,
     publicnode::PublicnodeProvider,
     quicknode::QuicknodeProvider,
     solscan::SolScanProvider,
-    syndica::SyndicaProvider,
+    sui::SuiProvider,
+    syndica::{SyndicaProvider, SyndicaWsProvider},
     tenderly::TenderlyProvider,
+    therpc::TheRpcProvider,
     unichain::UnichainProvider,
     wemix::WemixProvider,
+    zan::ZanProvider,
     zerion::ZerionProvider,
     zksync::ZKSyncProvider,
     zora::{ZoraProvider, ZoraWsProvider},
@@ -143,7 +151,6 @@ pub struct ProvidersConfig {
     /// Redis address for provider's responses caching
     pub cache_redis_addr: Option<String>,
 
-    pub infura_project_id: String,
     pub pokt_project_id: String,
     pub quicknode_api_tokens: String,
 
@@ -152,16 +159,12 @@ pub struct ProvidersConfig {
     pub coinbase_app_id: Option<String>,
     pub one_inch_api_key: Option<String>,
     pub one_inch_referrer: Option<String>,
-    /// GetBlock provider access tokens in JSON format
-    pub getblock_access_tokens: Option<String>,
     /// Pimlico API token key
     pub pimlico_api_key: String,
     /// SolScan API v2 token key
     pub solscan_api_v2_token: String,
     /// Bungee API key
     pub bungee_api_key: String,
-    /// Lava API key
-    pub lava_api_key: String,
     /// Tenderly API key
     pub tenderly_api_key: String,
     /// Tenderly Account ID
@@ -178,6 +181,10 @@ pub struct ProvidersConfig {
     pub meld_api_key: String,
     /// Meld API Base URL
     pub meld_api_url: String,
+    /// CallStatic API key
+    pub callstatic_api_key: String,
+    /// Zan API key
+    pub zan_api_key: String,
 
     pub override_bundler_urls: Option<MockAltoUrls>,
 }
@@ -668,7 +675,6 @@ impl ProviderRepository {
 pub enum ProviderKind {
     Aurora,
     Arbitrum,
-    Infura,
     Pokt,
     Binance,
     Bungee,
@@ -682,10 +688,8 @@ pub enum ProviderKind {
     Quicknode,
     Near,
     Mantle,
-    GetBlock,
     SolScan,
     Unichain,
-    Lava,
     Morph,
     Tenderly,
     Dune,
@@ -696,6 +700,13 @@ pub enum ProviderKind {
     Allnodes,
     Meld,
     Monad,
+    Sui,
+    Hiro,
+    CallStatic,
+    OneRpc,
+    TheRpc,
+    Zan,
+    Moonbeam,
 }
 
 impl Display for ProviderKind {
@@ -706,7 +717,6 @@ impl Display for ProviderKind {
             match self {
                 ProviderKind::Aurora => "Aurora",
                 ProviderKind::Arbitrum => "Arbitrum",
-                ProviderKind::Infura => "Infura",
                 ProviderKind::Pokt => "Pokt",
                 ProviderKind::Binance => "Binance",
                 ProviderKind::Wemix => "Wemix",
@@ -721,10 +731,8 @@ impl Display for ProviderKind {
                 ProviderKind::Quicknode => "Quicknode",
                 ProviderKind::Near => "Near",
                 ProviderKind::Mantle => "Mantle",
-                ProviderKind::GetBlock => "GetBlock",
                 ProviderKind::SolScan => "SolScan",
                 ProviderKind::Unichain => "Unichain",
-                ProviderKind::Lava => "Lava",
                 ProviderKind::Morph => "Morph",
                 ProviderKind::Tenderly => "Tenderly",
                 ProviderKind::Dune => "Dune",
@@ -734,6 +742,13 @@ impl Display for ProviderKind {
                 ProviderKind::Allnodes => "Allnodes",
                 ProviderKind::Meld => "Meld",
                 ProviderKind::Monad => "Monad",
+                ProviderKind::Sui => "Sui",
+                ProviderKind::Hiro => "Hiro",
+                ProviderKind::CallStatic => "CallStatic",
+                ProviderKind::OneRpc => "OneRpc",
+                ProviderKind::TheRpc => "TheRpc",
+                ProviderKind::Zan => "Zan",
+                ProviderKind::Moonbeam => "Moonbeam",
             }
         )
     }
@@ -745,7 +760,6 @@ impl ProviderKind {
         match s {
             "Aurora" => Some(Self::Aurora),
             "Arbitrum" => Some(Self::Arbitrum),
-            "Infura" => Some(Self::Infura),
             "Pokt" => Some(Self::Pokt),
             "Binance" => Some(Self::Binance),
             "Bungee" => Some(Self::Bungee),
@@ -759,10 +773,8 @@ impl ProviderKind {
             "Quicknode" => Some(Self::Quicknode),
             "Near" => Some(Self::Near),
             "Mantle" => Some(Self::Mantle),
-            "GetBlock" => Some(Self::GetBlock),
             "SolScan" => Some(Self::SolScan),
             "Unichain" => Some(Self::Unichain),
-            "Lava" => Some(Self::Lava),
             "Morph" => Some(Self::Morph),
             "Tenderly" => Some(Self::Tenderly),
             "Dune" => Some(Self::Dune),
@@ -773,6 +785,13 @@ impl ProviderKind {
             "Allnodes" => Some(Self::Allnodes),
             "Meld" => Some(Self::Meld),
             "Monad" => Some(Self::Monad),
+            "Sui" => Some(Self::Sui),
+            "Hiro" => Some(Self::Hiro),
+            "CallStatic" => Some(Self::CallStatic),
+            "OneRpc" => Some(Self::OneRpc),
+            "TheRpc" => Some(Self::TheRpc),
+            "Zan" => Some(Self::Zan),
+            "Moonbeam" => Some(Self::Moonbeam),
             _ => None,
         }
     }

@@ -164,12 +164,6 @@ variable "postgres_url" {
 #-------------------------------------------------------------------------------
 # Providers
 
-variable "infura_project_id" {
-  description = "The project ID for Infura"
-  type        = string
-  sensitive   = true
-}
-
 variable "pokt_project_id" {
   description = "The project ID for POKT"
   type        = string
@@ -212,12 +206,6 @@ variable "one_inch_referrer" {
   sensitive   = true
 }
 
-variable "getblock_access_tokens" {
-  description = "Mapping of API access tokens for GetBlock in JSON format"
-  type        = string
-  sensitive   = true
-}
-
 variable "pimlico_api_key" {
   description = "Pimlico bundler API token key"
   type        = string
@@ -232,12 +220,6 @@ variable "solscan_api_v2_token" {
 
 variable "bungee_api_key" {
   description = "Bungee API key"
-  type        = string
-  sensitive   = true
-}
-
-variable "lava_api_key" {
-  description = "Lava API key"
   type        = string
   sensitive   = true
 }
@@ -286,6 +268,18 @@ variable "meld_api_key" {
 
 variable "meld_api_url" {
   description = "Meld API base URL. e.g. https://api.meld.io"
+  type        = string
+  sensitive   = true
+}
+
+variable "callstatic_api_key" {
+  description = "Callstatic API key"
+  type        = string
+  sensitive   = true
+}
+
+variable "zan_api_key" {
+  description = "Zan API key"
   type        = string
   sensitive   = true
 }
@@ -501,5 +495,12 @@ variable "binance_host" {
   description = "Binance host"
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "pay_allowed_project_ids" {
+  description = "Allowed project ids for pay with exchange"
+  type        = string
+  sensitive   = false
   default     = ""
 }

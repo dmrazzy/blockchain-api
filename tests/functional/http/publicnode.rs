@@ -2,6 +2,7 @@ use {
     super::{
         check_if_rpc_is_responding_correctly_for_bitcoin,
         check_if_rpc_is_responding_correctly_for_solana,
+        check_if_rpc_is_responding_correctly_for_sui,
         check_if_rpc_is_responding_correctly_for_supported_chain,
     },
     crate::context::ServerContext,
@@ -147,6 +148,15 @@ async fn publicnode_provider(ctx: &mut ServerContext) {
     check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:10", "0xa")
         .await;
 
+    // Optimism Sepolia
+    check_if_rpc_is_responding_correctly_for_supported_chain(
+        ctx,
+        &provider,
+        "eip155:11155420",
+        "0xaa37dc",
+    )
+    .await;
+
     // Arbitrum One
     check_if_rpc_is_responding_correctly_for_supported_chain(
         ctx,
@@ -182,6 +192,19 @@ async fn publicnode_provider(ctx: &mut ServerContext) {
         "0x515",
     )
     .await;
+
+    // Sonic Mainnet
+    check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:146", "0x92")
+        .await;
+
+    // Sonic Testnet
+    check_if_rpc_is_responding_correctly_for_supported_chain(
+        ctx,
+        &provider,
+        "eip155:57054",
+        "0xdede",
+    )
+    .await;
 }
 
 #[test_context(ServerContext)]
@@ -210,7 +233,7 @@ async fn publicnode_provider_bitcoin(ctx: &mut ServerContext) {
 #[test_context(ServerContext)]
 #[tokio::test]
 #[ignore]
-async fn quicknode_provider_solana(ctx: &mut ServerContext) {
+async fn publicnode_provider_solana(ctx: &mut ServerContext) {
     let provider = ProviderKind::Publicnode;
     // Solana mainnet
     check_if_rpc_is_responding_correctly_for_solana(
@@ -219,4 +242,15 @@ async fn quicknode_provider_solana(ctx: &mut ServerContext) {
         &provider,
     )
     .await;
+}
+
+#[test_context(ServerContext)]
+#[tokio::test]
+#[ignore]
+async fn publicnode_provider_sui(ctx: &mut ServerContext) {
+    let provider = ProviderKind::Publicnode;
+    // Sui mainnet
+    check_if_rpc_is_responding_correctly_for_sui(ctx, &provider, "mainnet", "35834a8a").await;
+    // Sui testnet
+    check_if_rpc_is_responding_correctly_for_sui(ctx, &provider, "testnet", "4c78adac").await;
 }

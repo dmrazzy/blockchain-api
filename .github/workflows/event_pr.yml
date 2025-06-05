@@ -70,24 +70,27 @@ jobs:
       - run: docker compose up -d redis postgres
       - run: cargo build --tests --features=test-mock-bundler # pre-build to parallelize container startup
       - run: while ! curl localhost:8545/health; do sleep 1; done # Anvil
+        timeout-minutes: 5
       - run: while ! curl localhost:4337/health; do sleep 1; done # Mock Bundler
+        timeout-minutes: 5
       - run: while ! curl localhost:3000/ping; do sleep 1; done   # Mock Paymaster
+        timeout-minutes: 5
       - run: cargo test --features=test-mock-bundler --lib --bins
         env:
           RPC_PROXY_POSTGRES_URI: "postgres://postgres@localhost/postgres"
-          RPC_PROXY_PROVIDER_INFURA_PROJECT_ID: ""
           RPC_PROXY_PROVIDER_POKT_PROJECT_ID: ""
           RPC_PROXY_PROVIDER_QUICKNODE_API_TOKENS: ""
           RPC_PROXY_PROVIDER_PIMLICO_API_KEY: ""
           RPC_PROXY_PROVIDER_SOLSCAN_API_V2_TOKEN: ""
           RPC_PROXY_PROVIDER_BUNGEE_API_KEY: ""
-          RPC_PROXY_PROVIDER_LAVA_API_KEY: ""
           RPC_PROXY_PROVIDER_TENDERLY_API_KEY: ""
           RPC_PROXY_PROVIDER_TENDERLY_ACCOUNT_ID: ""
           RPC_PROXY_PROVIDER_TENDERLY_PROJECT_ID: ""
           RPC_PROXY_PROVIDER_ZERION_API_KEY: ""
           RPC_PROXY_PROVIDER_DUNE_API_KEY: ""
           RPC_PROXY_PROVIDER_SYNDICA_API_KEY: ""
+          RPC_PROXY_PROVIDER_CALLSTATIC_API_KEY: ""
+          RPC_PROXY_PROVIDER_ZAN_API_KEY: ""
           RPC_PROXY_PROVIDER_ALLNODES_API_KEY: ""
           RPC_PROXY_PROVIDER_MELD_API_KEY: ""
           RPC_PROXY_PROVIDER_MELD_API_URL: ""
