@@ -1,7 +1,7 @@
 use {
     super::{Provider, ProviderKind, RateLimited, RpcProvider, RpcProviderFactory},
     crate::{
-        env::GetBlockConfig,
+        env::SuiConfig,
         error::{RpcError, RpcResult},
     },
     async_trait::async_trait,
@@ -16,13 +16,12 @@ use {
 };
 
 #[derive(Debug)]
-pub struct GetBlockProvider {
-    base_api_url: String,
-    client: Client<HttpsConnector<HttpConnector>>,
-    supported_chains: HashMap<String, String>,
+pub struct SuiProvider {
+    pub client: Client<HttpsConnector<HttpConnector>>,
+    pub supported_chains: HashMap<String, String>,
 }
 
-impl Provider for GetBlockProvider {
+impl Provider for SuiProvider {
     fn supports_caip_chainid(&self, chain_id: &str) -> bool {
         self.supported_chains.contains_key(chain_id)
     }
@@ -32,28 +31,25 @@ impl Provider for GetBlockProvider {
     }
 
     fn provider_kind(&self) -> ProviderKind {
-        ProviderKind::GetBlock
+        ProviderKind::Sui
     }
 }
 
 #[async_trait]
-impl RateLimited for GetBlockProvider {
+impl RateLimited for SuiProvider {
     async fn is_rate_limited(&self, response: &mut Response) -> bool {
         response.status() == http::StatusCode::TOO_MANY_REQUESTS
-            || response.status() == http::StatusCode::PAYMENT_REQUIRED
     }
 }
 
 #[async_trait]
-impl RpcProvider for GetBlockProvider {
+impl RpcProvider for SuiProvider {
     #[tracing::instrument(skip(self, body), fields(provider = %self.provider_kind()), level = "debug")]
     async fn proxy(&self, chain_id: &str, body: hyper::body::Bytes) -> RpcResult<Response> {
-        let access_token_api = self
+        let uri = self
             .supported_chains
             .get(chain_id)
             .ok_or(RpcError::ChainNotFound)?;
-
-        let uri = format!("{}/{}", self.base_api_url, access_token_api);
 
         let hyper_request = hyper::http::Request::builder()
             .method(Method::POST)
@@ -62,7 +58,6 @@ impl RpcProvider for GetBlockProvider {
             .body(hyper::body::Body::from(body))?;
 
         let response = self.client.request(hyper_request).await?;
-
         let status = response.status();
         let body = hyper::body::to_bytes(response.into_body()).await?;
 
@@ -70,7 +65,7 @@ impl RpcProvider for GetBlockProvider {
             if response.error.is_some() && status.is_success() {
                 debug!(
                     "Strange: provider returned JSON RPC error, but status {status} is success: \
-                     GetBlock RPC: {response:?}"
+                 Sui: {response:?}"
                 );
             }
         }
@@ -83,20 +78,18 @@ impl RpcProvider for GetBlockProvider {
     }
 }
 
-impl RpcProviderFactory<GetBlockConfig> for GetBlockProvider {
+impl RpcProviderFactory<SuiConfig> for SuiProvider {
     #[tracing::instrument(level = "debug")]
-    fn new(provider_config: &GetBlockConfig) -> Self {
-        let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
+    fn new(provider_config: &SuiConfig) -> Self {
+        let forward_proxy_client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
         let supported_chains: HashMap<String, String> = provider_config
             .supported_chains
             .iter()
             .map(|(k, v)| (k.clone(), v.0.clone()))
             .collect();
-        let base_api_url = "https://go.getblock.io".to_string();
 
-        GetBlockProvider {
-            base_api_url,
-            client,
+        SuiProvider {
+            client: forward_proxy_client,
             supported_chains,
         }
     }
