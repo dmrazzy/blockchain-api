@@ -66,12 +66,14 @@ impl RpcWsProvider for ZoraWsProvider {
     ) -> RpcResult<Response> {
         let uri = self
             .supported_chains
-            .get(&query_params.chain_id.to_lowercase())
+            .get(&query_params.chain_id)
             .ok_or(RpcError::ChainNotFound)?;
 
         let project_id = query_params.project_id;
 
-        let (websocket_provider, _) = async_tungstenite::tokio::connect_async(uri).await?;
+        let (websocket_provider, _) = async_tungstenite::tokio::connect_async(uri)
+            .await
+            .map_err(|e| RpcError::AxumTungstenite(Box::new(e)))?;
 
         Ok(ws.on_upgrade(move |socket| {
             ws::proxy(project_id, socket, websocket_provider)

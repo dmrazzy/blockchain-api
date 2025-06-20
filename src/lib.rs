@@ -20,21 +20,22 @@ use {
         Router,
     },
     env::{
-        AllnodesConfig, ArbitrumConfig, AuroraConfig, BaseConfig, BinanceConfig, DrpcConfig,
-        DuneConfig, GetBlockConfig, InfuraConfig, LavaConfig, MantleConfig, MonadConfig,
-        MorphConfig, NearConfig, OdysseyConfig, PoktConfig, PublicnodeConfig, QuicknodeConfig,
-        SolScanConfig, SyndicaConfig, UnichainConfig, WemixConfig, ZKSyncConfig, ZerionConfig,
-        ZoraConfig,
+        AllnodesConfig, ArbitrumConfig, AuroraConfig, BaseConfig, BinanceConfig, BlastConfig,
+        CallStaticConfig, DrpcConfig, DuneConfig, HiroConfig, MantleConfig, MonadConfig,
+        MoonbeamConfig, MorphConfig, NearConfig, OdysseyConfig, PoktConfig, PublicnodeConfig,
+        QuicknodeConfig, RootstockConfig, SolScanConfig, SuiConfig, SyndicaConfig, TheRpcConfig,
+        UnichainConfig, WemixConfig, ZKSyncConfig, ZerionConfig, ZoraConfig,
     },
     error::RpcResult,
     http::Request,
     hyper::{header::HeaderName, http, server::conn::AddrIncoming, Body, Server},
     providers::{
-        AllnodesProvider, ArbitrumProvider, AuroraProvider, BaseProvider, BinanceProvider,
-        DrpcProvider, DuneProvider, GetBlockProvider, InfuraProvider, InfuraWsProvider,
-        LavaProvider, MantleProvider, MonadProvider, MorphProvider, NearProvider, OdysseyProvider,
-        PoktProvider, ProviderRepository, PublicnodeProvider, QuicknodeProvider, SolScanProvider,
-        SyndicaProvider, UnichainProvider, WemixProvider, ZKSyncProvider, ZerionProvider,
+        AllnodesProvider, AllnodesWsProvider, ArbitrumProvider, AuroraProvider, BaseProvider,
+        BinanceProvider, BlastProvider, CallStaticProvider, DrpcProvider, DuneProvider,
+        HiroProvider, MantleProvider, MonadProvider, MoonbeamProvider, MorphProvider, NearProvider,
+        OdysseyProvider, PoktProvider, ProviderRepository, PublicnodeProvider, QuicknodeProvider,
+        RootstockProvider, SolScanProvider, SuiProvider, SyndicaProvider, SyndicaWsProvider,
+        TheRpcProvider, UnichainProvider, WemixProvider, ZKSyncProvider, ZerionProvider,
         ZoraProvider, ZoraWsProvider,
     },
     sqlx::postgres::PgPoolOptions,
@@ -521,15 +522,10 @@ fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
     providers.add_rpc_provider::<QuicknodeProvider, QuicknodeConfig>(QuicknodeConfig::new(
         config.quicknode_api_tokens.clone(),
     ));
-    providers.add_rpc_provider::<InfuraProvider, InfuraConfig>(InfuraConfig::new(
-        config.infura_project_id.clone(),
-    ));
     providers.add_rpc_provider::<ZoraProvider, ZoraConfig>(ZoraConfig::default());
     providers.add_rpc_provider::<NearProvider, NearConfig>(NearConfig::default());
     providers.add_rpc_provider::<MantleProvider, MantleConfig>(MantleConfig::default());
     providers.add_rpc_provider::<UnichainProvider, UnichainConfig>(UnichainConfig::default());
-    providers
-        .add_rpc_provider::<LavaProvider, LavaConfig>(LavaConfig::new(config.lava_api_key.clone()));
     providers.add_rpc_provider::<SyndicaProvider, SyndicaConfig>(SyndicaConfig::new(
         config.syndica_api_key.clone(),
     ));
@@ -541,17 +537,24 @@ fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
         config.allnodes_api_key.clone(),
     ));
     providers.add_rpc_provider::<MonadProvider, MonadConfig>(MonadConfig::default());
-
-    if let Some(getblock_access_tokens) = &config.getblock_access_tokens {
-        providers.add_rpc_provider::<GetBlockProvider, GetBlockConfig>(GetBlockConfig::new(
-            getblock_access_tokens.clone(),
-        ));
-    };
-
-    providers.add_ws_provider::<InfuraWsProvider, InfuraConfig>(InfuraConfig::new(
-        config.infura_project_id.clone(),
+    providers.add_rpc_provider::<SuiProvider, SuiConfig>(SuiConfig::default());
+    providers.add_rpc_provider::<RootstockProvider, RootstockConfig>(RootstockConfig::default());
+    providers.add_rpc_provider::<HiroProvider, HiroConfig>(HiroConfig::default());
+    providers.add_rpc_provider::<CallStaticProvider, CallStaticConfig>(CallStaticConfig::new(
+        config.callstatic_api_key.clone(),
+    ));
+    providers.add_rpc_provider::<BlastProvider, BlastConfig>(BlastConfig::new(
+        config.blast_api_key.clone(),
+    ));
+    providers.add_rpc_provider::<MoonbeamProvider, MoonbeamConfig>(MoonbeamConfig::default());
+    providers.add_rpc_provider::<TheRpcProvider, TheRpcConfig>(TheRpcConfig::default());
+    providers.add_ws_provider::<AllnodesWsProvider, AllnodesConfig>(AllnodesConfig::new(
+        config.allnodes_api_key.clone(),
     ));
     providers.add_ws_provider::<ZoraWsProvider, ZoraConfig>(ZoraConfig::default());
+    providers.add_ws_provider::<SyndicaWsProvider, SyndicaConfig>(SyndicaConfig::new(
+        config.syndica_api_key.clone(),
+    ));
 
     providers.add_balance_provider::<ZerionProvider, ZerionConfig>(
         ZerionConfig::new(config.zerion_api_key.clone()),

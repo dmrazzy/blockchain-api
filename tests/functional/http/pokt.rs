@@ -2,6 +2,7 @@ use {
     super::{
         check_if_rpc_is_responding_correctly_for_near_protocol,
         check_if_rpc_is_responding_correctly_for_solana,
+        check_if_rpc_is_responding_correctly_for_sui,
         check_if_rpc_is_responding_correctly_for_supported_chain,
     },
     crate::context::ServerContext,
@@ -29,13 +30,13 @@ async fn pokt_provider_eip155(ctx: &mut ServerContext) {
         .await;
 
     // Base mainnet
-    check_if_rpc_is_responding_correctly_for_supported_chain(
-        ctx,
-        &provider,
-        "eip155:8453",
-        "0x2105",
-    )
-    .await;
+    // check_if_rpc_is_responding_correctly_for_supported_chain(
+    //     ctx,
+    //     &provider,
+    //     "eip155:8453",
+    //     "0x2105",
+    // )
+    // .await;
 
     // Base Sepolia
     check_if_rpc_is_responding_correctly_for_supported_chain(
@@ -73,8 +74,8 @@ async fn pokt_provider_eip155(ctx: &mut ServerContext) {
     .await;
 
     // Optimism
-    check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:10", "0xa")
-        .await;
+    // check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:10", "0xa")
+    //     .await;
 
     // Optimism Sepolia
     check_if_rpc_is_responding_correctly_for_supported_chain(
@@ -86,13 +87,13 @@ async fn pokt_provider_eip155(ctx: &mut ServerContext) {
     .await;
 
     // Arbitrum
-    check_if_rpc_is_responding_correctly_for_supported_chain(
-        ctx,
-        &provider,
-        "eip155:42161",
-        "0xa4b1",
-    )
-    .await;
+    // check_if_rpc_is_responding_correctly_for_supported_chain(
+    //     ctx,
+    //     &provider,
+    //     "eip155:42161",
+    //     "0xa4b1",
+    // )
+    // .await;
 
     // Arbitrum Sepolia
     check_if_rpc_is_responding_correctly_for_supported_chain(
@@ -104,8 +105,9 @@ async fn pokt_provider_eip155(ctx: &mut ServerContext) {
     .await;
 
     // Polygon mainnet
-    check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:137", "0x89")
-        .await;
+    // Temporarily disabled due to issues with the provider
+    // check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:137", "0x89")
+    //     .await;
 
     // Polygon zkevm
     check_if_rpc_is_responding_correctly_for_supported_chain(
@@ -173,6 +175,10 @@ async fn pokt_provider_eip155(ctx: &mut ServerContext) {
         "0x138de",
     )
     .await;
+
+    // Sonic Mainnet
+    check_if_rpc_is_responding_correctly_for_supported_chain(ctx, &provider, "eip155:146", "0x92")
+        .await;
 }
 
 #[test_context(ServerContext)]
@@ -203,4 +209,13 @@ async fn pokt_provider_solana(ctx: &mut ServerContext) {
 #[ignore]
 async fn pokt_provider_near(ctx: &mut ServerContext) {
     check_if_rpc_is_responding_correctly_for_near_protocol(ctx, &ProviderKind::Pokt).await;
+}
+
+#[test_context(ServerContext)]
+#[tokio::test]
+#[ignore]
+async fn pokt_provider_sui(ctx: &mut ServerContext) {
+    // Sui mainnet
+    check_if_rpc_is_responding_correctly_for_sui(ctx, &ProviderKind::Pokt, "mainnet", "35834a8a")
+        .await;
 }

@@ -1416,6 +1416,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert-json-diff"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47e4f2b81832e72834d7518d8487a0396a28cc408186a2e8854c0f98011faf12"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8280,7 +8290,7 @@ dependencies = [
 
 [[package]]
 name = "rpc-proxy"
-version = "0.227.2"
+version = "0.254.0"
 dependencies = [
  "alloy 0.11.1",
  "anyhow",
@@ -8349,6 +8359,7 @@ dependencies = [
  "vergen",
  "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.9.0)",
  "wcn_replication",
+ "wiremock",
  "yttrium",
 ]
 
@@ -13935,6 +13946,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "wiremock"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "101681b74cd87b5899e87bcf5a64e83334dd313fcd3053ea72e6dba18928e301"
+dependencies = [
+ "assert-json-diff",
+ "async-trait",
+ "base64 0.22.1",
+ "deadpool",
+ "futures",
+ "http 1.3.1",
+ "http-body-util",
+ "hyper 1.6.0",
+ "hyper-util",
+ "log",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "wit-bindgen-rt"
 version = "0.39.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14072,7 +14107,7 @@ dependencies = [
 [[package]]
 name = "yttrium"
 version = "0.1.0"
-source = "git+https://github.com/reown-com/yttrium.git?rev=4fc5341#4fc534117b5576fe3ecf17f5eeeac59d5f23aa12"
+source = "git+https://github.com/reown-com/yttrium.git?rev=5e1b5f4#5e1b5f4d214f08819794d84f488178a64b1d5108"
 dependencies = [
  "alloy 0.11.1",
  "alloy-provider 0.11.1",
