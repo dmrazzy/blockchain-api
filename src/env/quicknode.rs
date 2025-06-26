@@ -55,33 +55,52 @@ fn extract_supported_chains_and_subdomains(
     let supported_chain_ids = HashMap::from([
         (
             "eip155:324",
-            ("snowy-chaotic-hill.zksync-mainnet", Priority::Custom(1)),
+            ("snowy-chaotic-hill.zksync-mainnet", Priority::Low),
         ),
         (
             "eip155:1101",
-            ("clean-few-meme.zkevm-mainnet", Priority::Custom(1)),
+            ("clean-few-meme.zkevm-mainnet", Priority::Low),
         ),
         (
             "eip155:42161",
-            (
-                "divine-special-snowflake.arbitrum-mainnet",
-                Priority::Custom(1),
-            ),
+            ("divine-special-snowflake.arbitrum-mainnet", Priority::Low),
         ),
         (
             "eip155:80084",
-            ("frequent-capable-putty.bera-bartio", Priority::Normal),
+            ("frequent-capable-putty.bera-bartio", Priority::Low),
         ),
         (
             "eip155:10",
-            ("convincing-dawn-smoke.optimism", Priority::Custom(1)),
+            ("convincing-dawn-smoke.optimism", Priority::Low),
+        ),
+        (
+            "eip155:8453",
+            ("indulgent-methodical-emerald.base-mainnet", Priority::Low),
+        ),
+        ("eip155:56", ("muddy-compatible-general.bsc", Priority::Low)),
+        (
+            "eip155:8217",
+            ("sleek-solitary-telescope.kaia-mainnet", Priority::Low),
+        ),
+        (
+            "eip155:421614",
+            ("thrumming-quaint-flower.arbitrum-sepolia", Priority::Low),
+        ),
+        (
+            "eip155:80094",
+            ("convincing-prettiest-wind.bera-mainnet", Priority::Low),
+        ),
+        (
+            "eip155:11155111",
+            ("crimson-spring-wind.ethereum-sepolia", Priority::Low),
+        ),
+        (
+            "eip155:137",
+            ("chaotic-wandering-fire.matic", Priority::Low),
         ),
         (
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-            (
-                "indulgent-thrumming-bush.solana-mainnet",
-                Priority::Custom(1),
-            ),
+            ("indulgent-thrumming-bush.solana-mainnet", Priority::Minimal),
         ),
         (
             "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",

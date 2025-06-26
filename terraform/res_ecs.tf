@@ -63,27 +63,26 @@ module "ecs" {
   postgres_url                       = module.postgres.database_url
 
   # Providers
-  infura_project_id      = var.infura_project_id
-  pokt_project_id        = var.pokt_project_id
-  quicknode_api_tokens   = var.quicknode_api_tokens
-  zerion_api_key         = var.zerion_api_key
-  coinbase_api_key       = var.coinbase_api_key
-  coinbase_app_id        = var.coinbase_app_id
-  one_inch_api_key       = var.one_inch_api_key
-  one_inch_referrer      = var.one_inch_referrer
-  getblock_access_tokens = var.getblock_access_tokens
-  pimlico_api_key        = var.pimlico_api_key
-  solscan_api_v2_token   = var.solscan_api_v2_token
-  bungee_api_key         = var.bungee_api_key
-  lava_api_key           = var.lava_api_key
-  tenderly_api_key       = var.tenderly_api_key
-  tenderly_account_id    = var.tenderly_account_id
-  tenderly_project_id    = var.tenderly_project_id
-  dune_api_key           = var.dune_api_key
-  syndica_api_key        = var.syndica_api_key
-  allnodes_api_key       = var.allnodes_api_key
-  meld_api_key           = var.meld_api_key
-  meld_api_url           = var.meld_api_url
+  pokt_project_id      = var.pokt_project_id
+  quicknode_api_tokens = var.quicknode_api_tokens
+  zerion_api_key       = var.zerion_api_key
+  coinbase_api_key     = var.coinbase_api_key
+  coinbase_app_id      = var.coinbase_app_id
+  one_inch_api_key     = var.one_inch_api_key
+  one_inch_referrer    = var.one_inch_referrer
+  pimlico_api_key      = var.pimlico_api_key
+  solscan_api_v2_token = var.solscan_api_v2_token
+  bungee_api_key       = var.bungee_api_key
+  tenderly_api_key     = var.tenderly_api_key
+  tenderly_account_id  = var.tenderly_account_id
+  tenderly_project_id  = var.tenderly_project_id
+  dune_api_key         = var.dune_api_key
+  syndica_api_key      = var.syndica_api_key
+  allnodes_api_key     = var.allnodes_api_key
+  meld_api_key         = var.meld_api_key
+  meld_api_url         = var.meld_api_url
+  callstatic_api_key   = var.callstatic_api_key
+  blast_api_key        = var.blast_api_key
 
   # Project Registry
   registry_api_endpoint   = var.registry_api_endpoint
@@ -124,13 +123,14 @@ module "ecs" {
   testing_project_id = var.testing_project_id
 
   # Exchanges
-  coinbase_project_id = var.coinbase_project_id
-  coinbase_key_name   = var.coinbase_key_name
-  coinbase_key_secret = var.coinbase_key_secret
-  binance_client_id   = var.binance_client_id
-  binance_token       = var.binance_token
-  binance_key         = var.binance_key
-  binance_host        = var.binance_host
+  coinbase_project_id     = var.coinbase_project_id
+  coinbase_key_name       = var.coinbase_key_name
+  coinbase_key_secret     = var.coinbase_key_secret
+  binance_client_id       = var.binance_client_id
+  binance_token           = var.binance_token
+  binance_key             = var.binance_key
+  binance_host            = var.binance_host
+  pay_allowed_project_ids = var.pay_allowed_project_ids
 
   depends_on = [aws_iam_role.application_role]
 }

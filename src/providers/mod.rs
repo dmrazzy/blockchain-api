@@ -68,17 +68,18 @@ mod arbitrum;
 mod aurora;
 mod base;
 mod binance;
+mod blast;
 mod bungee;
+mod callstatic;
 mod coinbase;
 mod drpc;
 mod dune;
-mod getblock;
-mod infura;
-mod lava;
+mod hiro;
 mod mantle;
 mod meld;
 pub mod mock_alto;
 mod monad;
+mod moonbeam;
 mod morph;
 mod near;
 mod odyssey;
@@ -87,9 +88,12 @@ mod pimlico;
 mod pokt;
 mod publicnode;
 mod quicknode;
+mod rootstock;
 mod solscan;
+mod sui;
 mod syndica;
 pub mod tenderly;
+mod therpc;
 mod unichain;
 mod weights;
 mod wemix;
@@ -98,20 +102,21 @@ mod zksync;
 mod zora;
 
 pub use {
-    allnodes::AllnodesProvider,
+    allnodes::{AllnodesProvider, AllnodesWsProvider},
     arbitrum::ArbitrumProvider,
     aurora::AuroraProvider,
     base::BaseProvider,
     binance::BinanceProvider,
+    blast::BlastProvider,
     bungee::BungeeProvider,
+    callstatic::CallStaticProvider,
     drpc::DrpcProvider,
     dune::DuneProvider,
-    getblock::GetBlockProvider,
-    infura::{InfuraProvider, InfuraWsProvider},
-    lava::LavaProvider,
+    hiro::HiroProvider,
     mantle::MantleProvider,
     meld::MeldProvider,
     monad::MonadProvider,
+    moonbeam::MoonbeamProvider,
     morph::MorphProvider,
     near::NearProvider,
     odyssey::OdysseyProvider,
@@ -120,9 +125,12 @@ pub use {
     pokt::PoktProvider,
     publicnode::PublicnodeProvider,
     quicknode::QuicknodeProvider,
+    rootstock::RootstockProvider,
     solscan::SolScanProvider,
-    syndica::SyndicaProvider,
+    sui::SuiProvider,
+    syndica::{SyndicaProvider, SyndicaWsProvider},
     tenderly::TenderlyProvider,
+    therpc::TheRpcProvider,
     unichain::UnichainProvider,
     wemix::WemixProvider,
     zerion::ZerionProvider,
@@ -143,7 +151,6 @@ pub struct ProvidersConfig {
     /// Redis address for provider's responses caching
     pub cache_redis_addr: Option<String>,
 
-    pub infura_project_id: String,
     pub pokt_project_id: String,
     pub quicknode_api_tokens: String,
 
@@ -152,16 +159,12 @@ pub struct ProvidersConfig {
     pub coinbase_app_id: Option<String>,
     pub one_inch_api_key: Option<String>,
     pub one_inch_referrer: Option<String>,
-    /// GetBlock provider access tokens in JSON format
-    pub getblock_access_tokens: Option<String>,
     /// Pimlico API token key
     pub pimlico_api_key: String,
     /// SolScan API v2 token key
     pub solscan_api_v2_token: String,
     /// Bungee API key
     pub bungee_api_key: String,
-    /// Lava API key
-    pub lava_api_key: String,
     /// Tenderly API key
     pub tenderly_api_key: String,
     /// Tenderly Account ID
@@ -178,6 +181,10 @@ pub struct ProvidersConfig {
     pub meld_api_key: String,
     /// Meld API Base URL
     pub meld_api_url: String,
+    /// CallStatic API key
+    pub callstatic_api_key: String,
+    /// Blast.io API key
+    pub blast_api_key: String,
 
     pub override_bundler_urls: Option<MockAltoUrls>,
 }
@@ -450,23 +457,58 @@ impl ProviderRepository {
             return Err(RpcError::UnsupportedChain(namespace.to_string()));
         }
 
-        let weights: Vec<_> = providers
-            .iter()
-            .map(|(_, weight)| weight.value())
-            .map(|w| w.max(1))
-            .collect();
-        let non_zero_weight_providers = weights.iter().filter(|&x| *x > 0).count();
-        let keys = providers.keys().cloned().collect::<Vec<_>>();
+        // Adding non-minimal priority providers and use providers with the minimal priority
+        // only for a failover retrying (append them to the end of the list)
+        let minimal_weight_value = Weight::new(Priority::Minimal)
+            .expect("Failed to create a Minimal priority value")
+            .value();
 
-        match WeightedIndex::new(weights) {
+        // Separate providers by weight and collect references
+        let (high_priority_providers, non_minimal_weight_providers, minimal_weight_providers): (
+            Vec<_>,
+            Vec<_>,
+            Vec<_>,
+        ) = providers.iter().fold(
+            (Vec::new(), Vec::new(), Vec::new()),
+            |(mut high_priority, mut non_minimal, mut minimal), (provider_kind, weight)| {
+                match weight.value().cmp(&minimal_weight_value) {
+                    std::cmp::Ordering::Greater => {
+                        high_priority.push((provider_kind, weight));
+                        non_minimal.push(weight.value());
+                    }
+                    std::cmp::Ordering::Equal => {
+                        if let Some(provider) = self.balance_providers.get(provider_kind) {
+                            minimal.push(provider.clone());
+                        }
+                    }
+                    // We don't have weights less than minimal priority
+                    std::cmp::Ordering::Less => {}
+                }
+                (high_priority, non_minimal, minimal)
+            },
+        );
+
+        let keys: Vec<_> = high_priority_providers.iter().map(|(key, _)| key).collect();
+
+        // If no non-minimal providers are available, directly append minimal-priority providers
+        if non_minimal_weight_providers.is_empty() {
+            let minimal_weight_providers = minimal_weight_providers
+                .into_iter()
+                .take(max_providers)
+                .collect::<Vec<_>>();
+            return Ok(minimal_weight_providers);
+        }
+
+        match WeightedIndex::new(non_minimal_weight_providers.clone()) {
             Ok(mut dist) => {
-                let providers_to_iterate = std::cmp::min(max_providers, non_zero_weight_providers);
-                let providers_result = (0..providers_to_iterate)
+                let providers_to_iterate =
+                    std::cmp::min(max_providers, non_minimal_weight_providers.len());
+                let mut providers_result = (0..providers_to_iterate)
                     .map(|i| {
                         let dist_key = dist.sample(&mut OsRng);
                         let provider = keys.get(dist_key).ok_or_else(|| {
                             RpcError::WeightedProvidersIndex(format!(
-                                "Failed to get random balanceprovider for namespace: {}",
+                                "Failed to get random balance provider for namespace: {}",
                                 namespace
                             ))
                         })?;
@@ -494,6 +536,15 @@ impl ProviderRepository {
                             })
                     })
                     .collect::<Result<Vec<_>, _>>()?;
+
+                // Append minimal-priority providers to the end of the list, capped to remaining capacity
+                let remaining_capacity = max_providers.saturating_sub(providers_result.len());
+                providers_result.extend(
+                    minimal_weight_providers
+                        .into_iter()
+                        .take(remaining_capacity),
+                );
+
                 Ok(providers_result)
             }
             Err(e) => {
@@ -668,7 +719,6 @@ impl ProviderRepository {
 pub enum ProviderKind {
     Aurora,
     Arbitrum,
-    Infura,
     Pokt,
     Binance,
     Bungee,
@@ -682,10 +732,8 @@ pub enum ProviderKind {
     Quicknode,
     Near,
     Mantle,
-    GetBlock,
     SolScan,
     Unichain,
-    Lava,
     Morph,
     Tenderly,
     Dune,
@@ -696,6 +744,13 @@ pub enum ProviderKind {
     Allnodes,
     Meld,
     Monad,
+    Sui,
+    Hiro,
+    CallStatic,
+    TheRpc,
+    Moonbeam,
+    Blast,
+    Rootstock,
 }
 
 impl Display for ProviderKind {
@@ -706,7 +761,6 @@ impl Display for ProviderKind {
             match self {
                 ProviderKind::Aurora => "Aurora",
                 ProviderKind::Arbitrum => "Arbitrum",
-                ProviderKind::Infura => "Infura",
                 ProviderKind::Pokt => "Pokt",
                 ProviderKind::Binance => "Binance",
                 ProviderKind::Wemix => "Wemix",
@@ -721,10 +775,8 @@ impl Display for ProviderKind {
                 ProviderKind::Quicknode => "Quicknode",
                 ProviderKind::Near => "Near",
                 ProviderKind::Mantle => "Mantle",
-                ProviderKind::GetBlock => "GetBlock",
                 ProviderKind::SolScan => "SolScan",
                 ProviderKind::Unichain => "Unichain",
-                ProviderKind::Lava => "Lava",
                 ProviderKind::Morph => "Morph",
                 ProviderKind::Tenderly => "Tenderly",
                 ProviderKind::Dune => "Dune",
@@ -734,6 +786,13 @@ impl Display for ProviderKind {
                 ProviderKind::Allnodes => "Allnodes",
                 ProviderKind::Meld => "Meld",
                 ProviderKind::Monad => "Monad",
+                ProviderKind::Sui => "Sui",
+                ProviderKind::Hiro => "Hiro",
+                ProviderKind::CallStatic => "CallStatic",
+                ProviderKind::TheRpc => "TheRpc",
+                ProviderKind::Moonbeam => "Moonbeam",
+                ProviderKind::Blast => "Blast",
+                ProviderKind::Rootstock => "Rootstock",
             }
         )
     }
@@ -745,7 +804,6 @@ impl ProviderKind {
         match s {
             "Aurora" => Some(Self::Aurora),
             "Arbitrum" => Some(Self::Arbitrum),
-            "Infura" => Some(Self::Infura),
             "Pokt" => Some(Self::Pokt),
             "Binance" => Some(Self::Binance),
             "Bungee" => Some(Self::Bungee),
@@ -759,10 +817,8 @@ impl ProviderKind {
             "Quicknode" => Some(Self::Quicknode),
             "Near" => Some(Self::Near),
             "Mantle" => Some(Self::Mantle),
-            "GetBlock" => Some(Self::GetBlock),
             "SolScan" => Some(Self::SolScan),
             "Unichain" => Some(Self::Unichain),
-            "Lava" => Some(Self::Lava),
             "Morph" => Some(Self::Morph),
             "Tenderly" => Some(Self::Tenderly),
             "Dune" => Some(Self::Dune),
@@ -773,6 +829,13 @@ impl ProviderKind {
             "Allnodes" => Some(Self::Allnodes),
             "Meld" => Some(Self::Meld),
             "Monad" => Some(Self::Monad),
+            "Sui" => Some(Self::Sui),
+            "Hiro" => Some(Self::Hiro),
+            "CallStatic" => Some(Self::CallStatic),
+            "TheRpc" => Some(Self::TheRpc),
+            "Moonbeam" => Some(Self::Moonbeam),
+            "Blast" => Some(Self::Blast),
+            "Rootstock" => Some(Self::Rootstock),
             _ => None,
         }
     }
