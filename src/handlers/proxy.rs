@@ -29,7 +29,7 @@ use {
     wc::future::FutureExt,
 };
 
-const PROVIDER_PROXY_MAX_CALLS: usize = 3;
+const PROVIDER_PROXY_MAX_CALLS: usize = 5;
 const PROVIDER_PROXY_CALL_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub async fn handler(
@@ -71,8 +71,8 @@ pub async fn rpc_call(
     if query_params.session_id.is_some() {
         let provider_kind = match chain_id.as_str() {
             "eip155:10" => Some(ProviderKind::Quicknode), // Optimism
-            "eip155:8453" => Some(ProviderKind::Lava),    // Base
-            "eip155:42161" => Some(ProviderKind::Lava),   // Arbitrum One
+            "eip155:8453" => Some(ProviderKind::Publicnode), // Base
+            "eip155:42161" => Some(ProviderKind::Publicnode), // Arbitrum One
             _ => {
                 debug!(
                     "Requested sessionId for chain {chain_id} but no hardcoded provider was configured"
@@ -172,7 +172,7 @@ pub async fn rpc_call(
     }
 
     state.metrics.add_no_providers_for_chain(chain_id.clone());
-    debug!("All providers failed for chain_id: {}", chain_id);
+    debug!("All providers failed for chain_id: {chain_id}");
     Err(RpcError::ChainTemporarilyUnavailable(chain_id))
 }
 

@@ -6,22 +6,22 @@ use {
     test_context::test_context,
 };
 
+pub(crate) mod allnodes;
 pub(crate) mod arbitrum;
 pub(crate) mod aurora;
 pub(crate) mod base;
 pub(crate) mod binance;
 pub(crate) mod drpc;
-pub(crate) mod getblock;
-pub(crate) mod infura;
-pub(crate) mod lava;
 pub(crate) mod mantle;
 pub(crate) mod monad;
+pub(crate) mod moonbeam;
 pub(crate) mod morph;
 pub(crate) mod near;
 pub(crate) mod odyssey;
 pub(crate) mod pokt;
 pub(crate) mod publicnode;
 pub(crate) mod quicknode;
+pub(crate) mod sui;
 pub(crate) mod syndica;
 pub(crate) mod unichain;
 pub(crate) mod wemix;
@@ -57,7 +57,7 @@ async fn check_if_rpc_is_responding_correctly_for_supported_chain(
             // Check chainId
             assert_eq!(rpc_response.result::<String>().unwrap(), expected_id)
         }
-        _ => panic!("Unexpected status code: {}", status),
+        _ => panic!("Unexpected status code: {status}"),
     };
 }
 
@@ -96,7 +96,7 @@ async fn check_if_rpc_is_responding_correctly_for_near_protocol(
                 "mainnet"
             )
         }
-        _ => panic!("Unexpected status code: {}", status),
+        _ => panic!("Unexpected status code: {status}"),
     };
 }
 
@@ -119,7 +119,7 @@ async fn check_if_rpc_is_responding_correctly_for_solana(
     };
 
     let (status, rpc_response) =
-        send_jsonrpc_request(client, addr, &format!("solana:{}", chain_id), request).await;
+        send_jsonrpc_request(client, addr, &format!("solana:{chain_id}"), request).await;
 
     // Verify that HTTP communication was successful
     assert_eq!(status, StatusCode::OK);
@@ -129,6 +129,38 @@ async fn check_if_rpc_is_responding_correctly_for_solana(
 
     // Check chainId
     assert_eq!(rpc_response.result::<String>().unwrap(), "ok")
+}
+
+async fn check_if_rpc_is_responding_correctly_for_sui(
+    ctx: &ServerContext,
+    provider_id: &ProviderKind,
+    chain_id: &str,
+    expected_id: &str,
+) {
+    let addr = format!(
+        "{}v1/?projectId={}&providerId={}&chainId=",
+        ctx.server.public_addr, ctx.server.project_id, provider_id
+    );
+
+    let client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
+    let request = jsonrpc::Request {
+        method: "sui_getChainIdentifier",
+        params: None,
+        id: serde_json::Value::Number(1.into()),
+        jsonrpc: JSONRPC_VERSION,
+    };
+
+    let (status, rpc_response) =
+        send_jsonrpc_request(client, addr, &format!("sui:{chain_id}"), request).await;
+
+    // Verify that HTTP communication was successful
+    assert_eq!(status, StatusCode::OK);
+
+    // Verify there was no error in rpc
+    assert!(rpc_response.error.is_none());
+
+    // Verify the chainId is correct
+    assert_eq!(rpc_response.result::<String>().unwrap(), expected_id)
 }
 
 async fn check_if_rpc_is_responding_correctly_for_bitcoin(
@@ -150,7 +182,7 @@ async fn check_if_rpc_is_responding_correctly_for_bitcoin(
     };
 
     let (status, rpc_response) =
-        send_jsonrpc_request(client, addr, &format!("bip122:{}", chain_id), request).await;
+        send_jsonrpc_request(client, addr, &format!("bip122:{chain_id}"), request).await;
 
     // Verify that HTTP communication was successful
     assert_eq!(status, StatusCode::OK);

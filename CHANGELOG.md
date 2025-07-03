@@ -2,6 +2,426 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.260.2 - 2025-07-03
+#### Bug Fixes
+- adding trailing slash alias (#1137) - (0a75929) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.260.1 - 2025-07-03
+#### Bug Fixes
+- reverting Allnodes error handling with detailed error logging (#1134)" (#1135) - (7dd35ee) - Max Kalashnikoff | maksy.eth
+#### Tests
+- add comprehensive tests for validator address handling in prepare_calls (#1136) - (1719214) - Rafael Quintero
+
+- - -
+
+## 0.260.0 - 2025-07-02
+#### Features
+- **(RPC)** allowing WSS RPC requests to the standart /v1 endpoint (#1127) - (ec4a70c) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.259.1 - 2025-07-02
+#### Bug Fixes
+- Improve Allnodes error handling with detailed error logging (#1134) - (a73855a) - Chris Smith
+
+- - -
+
+## 0.259.0 - 2025-07-02
+#### Features
+- **(Hiro)** adding transfer fee endpoint support (#1128) - (ddd5f49) - Alfreedom
+
+- - -
+
+## 0.258.5 - 2025-07-01
+#### Bug Fixes
+- reverting #1131 and add only unmarshalling error catching (#1133) - (b6eacee) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.258.4 - 2025-07-01
+#### Bug Fixes
+- **(RPC)** proper handling of JSON-RPC internal error codes (#1131) - (5c0a9f0) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.258.3 - 2025-07-01
+#### Bug Fixes
+- **(Hiro)** fixing Hiro API response by wrapping it into the result field (#1130) - (1700051) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.258.2 - 2025-07-01
+#### Bug Fixes
+- fixing clippy errors due to the new Rust version (#1129) - (545eafe) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.258.1 - 2025-06-26
+#### Bug Fixes
+- **(Meld)** return quotes even if there is a bad request error (#1126) - (609c242) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.258.0 - 2025-06-25
+#### Features
+- **(RPC)** increasing Polygon Amoy and Avalanche Fuji providers (#1125) - (b0d4231) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.257.0 - 2025-06-25
+#### Features
+- **(wallet)** add smart sessions ownable validator support (#1108) - (ae6c051) - Rafael Quintero
+
+- - -
+
+## 0.256.0 - 2025-06-25
+#### Features
+- **(Stacks)** adding `stacks_accounts`, `stacks_extended_nonces` and `hiro_fees_transaction` RPC methods to map to Stacks extended and Hiro endpoints (#1119) - (b6ff676) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.255.2 - 2025-06-24
+#### Bug Fixes
+- **(Meld)** adding proper handling of the no valid quotes error code (#1124) - (e12cff1) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.255.1 - 2025-06-24
+#### Bug Fixes
+- **(Meld)** adding support for the new error message schema and removing payment types duplicates (#1123) - (ebaa31f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.255.0 - 2025-06-23
+#### Features
+- **(Meld)** getting quotes for all possible payment types (#1121) - (d1c569e) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.254.0 - 2025-06-20
+#### Features
+- **(Rootstock)** adding Rootstock native endpoints and Blast provider (#1120) - (9c5403b) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.253.0 - 2025-06-19
+#### Features
+- **(RPC)** adding Rootstock mainnet support (#1118) - (de0c0a9) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.252.0 - 2025-06-18
+#### Features
+- **(onRamp)** adding defaults by country properties (#1117) - (451e012) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.251.0 - 2025-06-16
+#### Features
+- **(providers)** enabling Pokt endpoints and tune Quicknode (#1116) - (99de8be) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.250.4 - 2025-06-13
+#### Bug Fixes
+- **(identity)** adding a proper handling of the node's null response (#1115) - (d4ee863) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.250.3 - 2025-06-12
+#### Bug Fixes
+- **(providers)** removing OneRpc free endpoints (#1113) - (46227b6) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.250.2 - 2025-06-12
+#### Bug Fixes
+- **(providers)** adding a proper handling of connection resets to providers (#1114) - (1fe3e25) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.250.1 - 2025-06-12
+#### Bug Fixes
+- **(Dune)** disabling exclude_spam_tokens and filtering by the pool size (#1112) - (f7b77b7) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.250.0 - 2025-06-11
+#### Features
+- **(rpc)** adding Polygon to Quicknode and Sei to the dRPC (#1111) - (7ea57b6) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.249.2 - 2025-06-10
+#### Bug Fixes
+- fixing history providers deserialization errors, simulation errors handling, identity error fix (#1110) - (68b1ac5) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.249.1 - 2025-06-10
+#### Bug Fixes
+- **(balance)** using the minimal priority providers only for a failover (#1107) - (fc37f03) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.249.0 - 2025-06-10
+#### Features
+- **(providers)** adding Quicknode endpoints, removing Zan, tuning alerts (#1109) - (3d000fd) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.248.0 - 2025-06-05
+#### Features
+- **(providers)** adding Moonbeam RPC chain support and Moonbeam RPC provider (#1105) - (fcc5070) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.247.4 - 2025-06-05
+#### Bug Fixes
+- **(OneRpc)** adding a provper handling of the rate-limited response (#1106) - (e949bd3) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.247.3 - 2025-06-05
+#### Bug Fixes
+- **(exchanges)** fixing the solana network name (#1104) - (e4672ad) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.247.2 - 2025-06-04
+#### Bug Fixes
+- **(TheRPC)** proper handling of the rate limiting response (#1102) - (52cdcc7) - Max Kalashnikoff | maksy.eth
+- adding Zan API key to terraform variables (#1101) - (64db1be) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.247.1 - 2025-06-04
+#### Bug Fixes
+- **(providers)** disabling CallStatic (#1100) - (d79fd2a) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.247.0 - 2025-06-04
+#### Features
+- **(providers)** adding Zan, OneRpc, TheRpc providers (#1099) - (ea4360f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.246.0 - 2025-06-04
+#### Features
+- enable binance flags (#1097) - (f9b645b) - Luka Isailovic
+
+- - -
+
+## 0.245.0 - 2025-06-03
+#### Features
+- **(providers)** adding CallStatic RPC provider (#1095) - (796c8c7) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.244.1 - 2025-06-03
+#### Bug Fixes
+- coinbase order status (#1096) - (cd21cb2) - Luka Isailovic
+
+- - -
+
+## 0.244.0 - 2025-06-02
+#### Features
+- **(providers)** temporarily disabling Op, Base and Arb in the Pokt provider (#1094) - (7c05482) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.243.0 - 2025-06-02
+#### Bug Fixes
+- **(RPC)** disabling Polygon for Pokt provider (#1092) - (b87d9eb) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(o11y)** adding wss RPC connection chart, removing http 500 error logs (#1091) - (01fb7e4) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.242.0 - 2025-05-30
+#### Bug Fixes
+- **(CI)** disabling chain abstraction integration tests (#1089) - (dacb7ed) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(utils)** updating CAIP-2 to names utility (#1090) - (cbbc630) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.241.0 - 2025-05-28
+#### Features
+- **(RPC)** adding Stacks transactions RPC support (#1088) - (0bec683) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.240.0 - 2025-05-27
+#### Features
+- **(providers)** extending providers for the Celo chain (#1087) - (c6fefbd) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.239.3 - 2025-05-27
+#### Bug Fixes
+- **(CA)** properly handling of the initial transaction simulation error (#1083) - (c3ff77d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.239.2 - 2025-05-27
+#### Bug Fixes
+- **(providers)** adding Linea chain to the dRPC and Publicnode, removing from Pokt (#1084) - (c352dd3) - Max Kalashnikoff | maksy.eth
+- **(test)** temporarily disabling bundler functional test (#1086) - (a9a93ac) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.239.1 - 2025-05-26
+#### Bug Fixes
+- **(logs)** distinguishing server errors and internal server errors (#1082) - (ff98774) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.239.0 - 2025-05-23
+#### Features
+- handle custom bundler URL (#1076) - (e0e4989) - Chris Smith
+
+- - -
+
+## 0.238.0 - 2025-05-22
+#### Bug Fixes
+- **(tests)** disabling the USDT Arbitrum v1 CA tests (#1080) - (f55b8a9) - Max Kalashnikoff | maksy.eth
+#### Features
+- **(providers)** decreasing BSC chain priority for the dRPC (#1081) - (ac309ec) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.237.0 - 2025-05-21
+#### Features
+- updating yttrium (#1079) - (a712a63) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.236.0 - 2025-05-21
+#### Features
+- **(providers)** adding Sui chain RPC support (#1078) - (969f0db) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.235.1 - 2025-05-20
+#### Bug Fixes
+- **(Meld)** proper handling of the bad request response (#1077) - (f11796f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.235.0 - 2025-05-19
+#### Features
+- **(RPC)** adding Solana RPC WebSocket support (#1073) - (da70416) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.234.0 - 2025-05-19
+#### Features
+- exchange projectid validation (#1075) - (b106c91) - Luka Isailovic
+
+- - -
+
+## 0.233.1 - 2025-05-16
+#### Bug Fixes
+- log bundler name in endpoint (#1074) - (60643f7) - Chris Smith
+
+- - -
+
+## 0.233.0 - 2025-05-16
+#### Features
+- enable more pairs for exchanges (#1072) - (30d39ff) - Luka Isailovic
+
+- - -
+
+## 0.232.1 - 2025-05-15
+#### Bug Fixes
+- changing domains from com to org and reown.com (#1067) - (8e3924f) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.232.0 - 2025-05-15
+#### Features
+- **(providers)** removing GetBlock RPC provider (#1066) - (dd70090) - Max Kalashnikoff | maksy.eth
+- removing Grafana SLA workspace support (#1071) - (c63bf9d) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.231.0 - 2025-05-14
+#### Features
+- ws provider fix (#1069) - (b7b59df) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.230.2 - 2025-05-14
+#### Bug Fixes
+- **(rpc)** using the Publicnode provider when session was provided (#1070) - (c193c90) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.230.1 - 2025-05-13
+#### Bug Fixes
+- **(terraform)** updating the RDS engine version (#1064) - (e328752) - Max Kalashnikoff | maksy.eth
+- coinbase transaction status (#1065) - (5346509) - Luka Isailovic
+
+- - -
+
+## 0.230.0 - 2025-05-13
+#### Features
+- **(providers)** removing Infura RPC provider (#1063) - (6b779e1) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.229.0 - 2025-05-12
+#### Features
+- **(chains)** adding Sonic Mainnet and Testnet RPC support (#1060) - (afb05ff) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.228.5 - 2025-05-12
+#### Bug Fixes
+- **(transactions)** adding a filtering by chainId (#1056) - (5408324) - Max Kalashnikoff | maksy.eth
+
+- - -
+
+## 0.228.4 - 2025-05-09
+#### Bug Fixes
+- buy url (#1062) - (d6eb8f5) - Luka Isailovic
+#### Miscellaneous Chores
+- change the implementation to use string float instead of hex (#1061) - (7b871d9) - Luka Isailovic
+
+- - -
+
+## 0.228.3 - 2025-05-09
+#### Bug Fixes
+- nonce manager (#1053) - (356effd) - Chris Smith
+
+- - -
+
+## 0.228.2 - 2025-05-07
+#### Bug Fixes
+- coinbase transaction status (#1058) - (43c8a22) - Luka Isailovic
+
+- - -
+
+## 0.228.1 - 2025-05-07
+#### Bug Fixes
+- FAUCET_REQUEST_API_KEY env var (#1059) - (e435f80) - Chris Smith
+#### Miscellaneous Chores
+- pay merchant name (#1057) - (3ddbb2c) - Luka Isailovic
+
+- - -
+
+## 0.228.0 - 2025-05-06
+#### Features
+- **(providers)** removing Lava provider (#1055) - (0648cdd) - Max Kalashnikoff | maksy.eth
+#### Miscellaneous Chores
+- update monitoring-role TF module (#1054) - (5c84ab5) - daniel
+
+- - -
+
 ## 0.227.2 - 2025-05-01
 #### Bug Fixes
 - **(CI)** fixing rate-limiting test and enabling sessions and chain abstraction tests on staging (#1052) - (bd13e5d) - Max Kalashnikoff | maksy.eth

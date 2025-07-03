@@ -202,7 +202,7 @@ async fn lookup_identity(
     headers: HeaderMap,
 ) -> Result<(IdentityLookupSource, IdentityResponse), RpcError> {
     let address_with_checksum = to_checksum(&address, None);
-    let cache_record_key = format!("{}-v1", address_with_checksum);
+    let cache_record_key = format!("{address_with_checksum}-v1");
 
     // Check if we should enable cache control for allow listed Project ID
     // The cache is enabled by default
@@ -369,8 +369,12 @@ pub fn handle_rpc_error(error: ProviderError) -> Result<(), RpcError> {
         ProviderError::CustomError(e) if e.starts_with(SELF_PROVIDER_ERROR_PREFIX) => {
             let error_detail = e.trim_start_matches(SELF_PROVIDER_ERROR_PREFIX);
             // Exception for no available JSON-RPC providers
-            if error_detail.contains("503 Service Unavailable") {
-                return Err(RpcError::ProviderError);
+            if error_detail.contains("503 Service Unavailable")
+                || error_detail.contains("400 Bad Request")
+            {
+                return Err(RpcError::IdentityProviderError(
+                    "No available JSON-RPC providers".into(),
+                ));
             }
             // Proceed with Ok() if the error is related to the contract call error
             // since there should be a wrong NFT avatar contract address.
@@ -381,10 +385,17 @@ pub fn handle_rpc_error(error: ProviderError) -> Result<(), RpcError> {
                 );
                 return Ok(());
             }
+            // Check if the error is GenericParameterError which means that the
+            // node returned null malformed response
+            if error_detail.contains("Generic parameter error") {
+                return Err(RpcError::IdentityProviderError(
+                    "Malformed response from the JSON-RPC provider on ENS name resolution".into(),
+                ));
+            }
             // Check the list of error codes that reflects an execution reverted
             // and should proceed with Ok()
             for &code in &JSON_RPC_OK_ERROR_CODES {
-                if error_detail.contains(&format!("code: {},", code)) {
+                if error_detail.contains(&format!("code: {code},")) {
                     debug!(
                         "JsonRpcError code {} while looking up identity: {:?}",
                         code, error_detail
@@ -494,7 +505,7 @@ impl ethers::providers::RpcError for SelfProviderError {
 
 impl From<SelfProviderError> for ProviderError {
     fn from(value: SelfProviderError) -> Self {
-        ProviderError::CustomError(format!("{}{}", SELF_PROVIDER_ERROR_PREFIX, value))
+        ProviderError::CustomError(format!("{SELF_PROVIDER_ERROR_PREFIX}{value}"))
     }
 }
 
@@ -562,8 +573,7 @@ impl JsonRpcClient for SelfProvider {
         };
         let result = serde_json::from_value(result).map_err(|e| {
             SelfProviderError::GenericParameterError(format!(
-                "Caller should always provide generic parameter R=Bytes: {}",
-                e
+                "Caller should always provide generic parameter R=Bytes: {e}"
             ))
         })?;
         Ok(result)

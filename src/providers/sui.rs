@@ -1,7 +1,7 @@
 use {
     super::{Provider, ProviderKind, RateLimited, RpcProvider, RpcProviderFactory},
     crate::{
-        env::LavaConfig,
+        env::SuiConfig,
         error::{RpcError, RpcResult},
     },
     async_trait::async_trait,
@@ -16,13 +16,12 @@ use {
 };
 
 #[derive(Debug)]
-pub struct LavaProvider {
+pub struct SuiProvider {
     pub client: Client<HttpsConnector<HttpConnector>>,
     pub supported_chains: HashMap<String, String>,
-    pub api_key: String,
 }
 
-impl Provider for LavaProvider {
+impl Provider for SuiProvider {
     fn supports_caip_chainid(&self, chain_id: &str) -> bool {
         self.supported_chains.contains_key(chain_id)
     }
@@ -32,30 +31,25 @@ impl Provider for LavaProvider {
     }
 
     fn provider_kind(&self) -> ProviderKind {
-        ProviderKind::Lava
+        ProviderKind::Sui
     }
 }
 
 #[async_trait]
-impl RateLimited for LavaProvider {
+impl RateLimited for SuiProvider {
     async fn is_rate_limited(&self, response: &mut Response) -> bool {
         response.status() == http::StatusCode::TOO_MANY_REQUESTS
     }
 }
 
 #[async_trait]
-impl RpcProvider for LavaProvider {
+impl RpcProvider for SuiProvider {
     #[tracing::instrument(skip(self, body), fields(provider = %self.provider_kind()), level = "debug")]
     async fn proxy(&self, chain_id: &str, body: hyper::body::Bytes) -> RpcResult<Response> {
-        let chain = &self
+        let uri = self
             .supported_chains
             .get(chain_id)
             .ok_or(RpcError::ChainNotFound)?;
-
-        let uri = format!(
-            "https://g.w.lavanet.xyz/gateway/{}/rpc-http/{}",
-            chain, &self.api_key
-        );
 
         let hyper_request = hyper::http::Request::builder()
             .method(Method::POST)
@@ -71,7 +65,7 @@ impl RpcProvider for LavaProvider {
             if response.error.is_some() && status.is_success() {
                 debug!(
                     "Strange: provider returned JSON RPC error, but status {status} is success: \
-                   Lava: {response:?}"
+                 Sui: {response:?}"
                 );
             }
         }
@@ -84,9 +78,9 @@ impl RpcProvider for LavaProvider {
     }
 }
 
-impl RpcProviderFactory<LavaConfig> for LavaProvider {
+impl RpcProviderFactory<SuiConfig> for SuiProvider {
     #[tracing::instrument(level = "debug")]
-    fn new(provider_config: &LavaConfig) -> Self {
+    fn new(provider_config: &SuiConfig) -> Self {
         let forward_proxy_client = Client::builder().build::<_, hyper::Body>(HttpsConnector::new());
         let supported_chains: HashMap<String, String> = provider_config
             .supported_chains
@@ -94,10 +88,9 @@ impl RpcProviderFactory<LavaConfig> for LavaProvider {
             .map(|(k, v)| (k.clone(), v.0.clone()))
             .collect();
 
-        LavaProvider {
+        SuiProvider {
             client: forward_proxy_client,
             supported_chains,
-            api_key: provider_config.api_key.clone(),
         }
     }
 }

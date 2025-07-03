@@ -143,7 +143,7 @@ pub struct ZerionTransactionTransfer {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub struct ZerionFungibleInfoAttribute {
-    pub name: String,
+    pub name: Option<String>,
     pub symbol: String,
     pub icon: Option<ZerionTransactionURLItem>,
     pub implementations: Vec<ZerionImplementation>,
@@ -251,7 +251,7 @@ impl HistoryProvider for ZerionProvider {
             &address
         );
         let mut url = Url::parse(&base).map_err(|e| {
-            error!("Error on parsing zerion history url with {}", e);
+            error!("Error on parsing zerion history url with {e}");
             RpcError::HistoryParseCursorError
         })?;
         url.query_pairs_mut()
@@ -263,9 +263,22 @@ impl HistoryProvider for ZerionProvider {
             url.query_pairs_mut().append_pair("page[after]", &cursor);
         }
 
+        if let Some(chain_id) = params.chain_id {
+            let chain_name = if chain_id.contains(':') {
+                crypto::ChainId::from_caip2(&chain_id)
+                    .ok_or(RpcError::InvalidParameter(chain_id))?
+            } else {
+                crypto::ChainId::from_caip2(&format!("eip155:{chain_id}"))
+                    .ok_or(RpcError::InvalidParameter(chain_id))?
+            };
+            url.query_pairs_mut()
+                .append_pair("filter[chain_ids]", &chain_name);
+        }
+
         let latency_start = SystemTime::now();
-        let response = self.send_request(url).await.tap_err(|e| {
-            error!("Error on request to zerion history endpoint with {}", e);
+        let response = self.send_request(url).await.map_err(|e| {
+            error!("Error on request to zerion transactions history endpoint with {e}");
+            RpcError::TransactionProviderError
         })?;
         metrics.add_latency_and_status_code_for_provider(
             self.provider_kind,
@@ -286,13 +299,13 @@ impl HistoryProvider for ZerionProvider {
             .json::<ZerionResponseBody<Vec<ZerionTransactionsReponseBody>>>()
             .await
             .tap_err(|e| {
-                error!("Error on parsing zerion history body with {}", e);
+                error!("Error on parsing zerion history body with {e}");
             })?;
 
         let next: Option<String> = match body.links.next {
             Some(url) => {
                 let url = Url::parse(&url).map_err(|e| {
-                    error!("Error on parsing zerion history next url with {}", e);
+                    error!("Error on parsing zerion history next url with {e}");
                     RpcError::HistoryParseCursorError
                 })?;
                 // Get the "after" query parameter
@@ -339,7 +352,7 @@ impl HistoryProvider for ZerionProvider {
                         Some(HistoryTransactionTransfer {
                             fungible_info: f.fungible_info.map(|f| {
                                 HistoryTransactionFungibleInfo {
-                                    name: Some(f.name),
+                                    name: f.name,
                                     symbol: Some(f.symbol),
                                     icon: f.icon.map(|f| HistoryTransactionURLItem { url: f.url }),
                                 }
@@ -402,7 +415,10 @@ impl PortfolioProvider for ZerionProvider {
             .append_pair("currency", &params.currency.unwrap_or("usd".to_string()));
 
         let latency_start = SystemTime::now();
-        let response = self.send_request(url).await?;
+        let response = self.send_request(url).await.map_err(|e| {
+            error!("Error on request to zerion portfolio endpoint with {e}");
+            RpcError::PortfolioProviderError
+        })?;
         metrics.add_latency_and_status_code_for_provider(
             self.provider_kind,
             response.status().into(),
@@ -428,7 +444,11 @@ impl PortfolioProvider for ZerionProvider {
             .into_iter()
             .map(|f| PortfolioPosition {
                 id: f.id,
-                name: f.attributes.fungible_info.name,
+                name: f
+                    .attributes
+                    .fungible_info
+                    .name
+                    .unwrap_or(f.attributes.fungible_info.symbol.clone()),
                 symbol: f.attributes.fungible_info.symbol,
             })
             .collect();
@@ -461,7 +481,7 @@ impl BalanceProvider for ZerionProvider {
                 crypto::ChainId::from_caip2(&chain_id)
                     .ok_or(RpcError::InvalidParameter(chain_id))?
             } else {
-                crypto::ChainId::from_caip2(&format!("eip155:{}", chain_id))
+                crypto::ChainId::from_caip2(&format!("eip155:{chain_id}"))
                     .ok_or(RpcError::InvalidParameter(chain_id))?
             };
             url.query_pairs_mut()
@@ -469,7 +489,10 @@ impl BalanceProvider for ZerionProvider {
         }
 
         let latency_start = SystemTime::now();
-        let response = self.send_request(url.clone()).await?;
+        let response = self.send_request(url.clone()).await.map_err(|e| {
+            error!("Error on request to zerion transactions history endpoint with {e}");
+            RpcError::BalanceProviderError
+        })?;
         metrics.add_latency_and_status_code_for_provider(
             self.provider_kind,
             response.status().into(),
@@ -507,7 +530,11 @@ impl BalanceProvider for ZerionProvider {
 
             // Set the default metadata from the response
             let mut token_metadata = TokenMetadataCacheItem {
-                name: f.attributes.fungible_info.name.clone(),
+                name: f
+                    .attributes
+                    .fungible_info
+                    .name
+                    .unwrap_or(f.attributes.fungible_info.symbol.clone()),
                 symbol: f.attributes.fungible_info.symbol.clone(),
                 icon_url: f
                     .attributes
@@ -520,7 +547,7 @@ impl BalanceProvider for ZerionProvider {
 
             // Update the token metadata from the cache or update the cache if it's not present
             if let Some(chain_id) = chain_id.clone() {
-                let caip10_token_address = format!("{}:{}", chain_id, token_address_strict);
+                let caip10_token_address = format!("{chain_id}:{token_address_strict}");
                 match metadata_cache.get_metadata(&caip10_token_address).await {
                     Ok(Some(cached_metadata)) => token_metadata = cached_metadata,
                     Ok(None) => {
@@ -532,13 +559,12 @@ impl BalanceProvider for ZerionProvider {
                                 .await
                             {
                                 error!(
-                                    "Error setting metadata in cache for {}: {}",
-                                    caip10_token_address, e
+                                    "Error setting metadata in cache for {caip10_token_address}: {e}"
                                 );
                             }
                         });
                     }
-                    Err(e) => error!("Error getting metadata from cache: {}", e),
+                    Err(e) => error!("Error getting metadata from cache: {e}"),
                 }
             }
 
@@ -554,7 +580,7 @@ impl BalanceProvider for ZerionProvider {
                         } else {
                             chain_id
                                 .as_ref()
-                                .map(|chain_id| format!("{}:{}", chain_id, addr))
+                                .map(|chain_id| format!("{chain_id}:{addr}"))
                         }
                     } else {
                         None

@@ -30,12 +30,42 @@ static CAIP19_TO_COINBASE_CRYPTO: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
             "eip155:8453/erc20:0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
             "USDC",
         ), // USDC on Base
+        (
+            "eip155:10/erc20:0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+            "USDC",
+        ), // USDC on Optimism
+        (
+            "eip155:42161/erc20:0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+            "USDC",
+        ), // USDC on Arbitrum
+        (
+            "eip155:137/erc20:0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+            "USDC",
+        ), // USDC on Polygon
+        (
+            "eip155:1/erc20:0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+            "USDC",
+        ), // USDC on Ethereum
+        ("eip155:1/slip44:60", "ETH"), // Native ETH
+        (
+            "eip155:1/erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "USDT",
+        ), // USDT on Ethereum
+        (
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "USDC",
+        ), // USDC on Solana
     ])
 });
 
 static CHAIN_ID_TO_COINBASE_NETWORK: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
     HashMap::from([
-        ("eip155:8453", "base"), // Base
+        ("eip155:8453", "base"),                               // Base
+        ("eip155:10", "optimism"),                             // Optimism
+        ("eip155:42161", "arbitrum"),                          // Arbitrum
+        ("eip155:137", "polygon"),                             // Polygon
+        ("eip155:1", "ethereum"),                              // Ethereum
+        ("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", "solana"), // Solana
     ])
 });
 
@@ -111,6 +141,7 @@ enum OnrampPaymentMethod {
     ApplePay,
     FiatWallet,
     CryptoWallet,
+    Unspecified,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -123,22 +154,30 @@ enum OnrampTransactionType {
 #[derive(Debug, Serialize, Deserialize)]
 struct OnrampTransaction {
     status: CoinbaseTransactionStatus,
-    purchase_currency: String,
-    purchase_network: String,
-    purchase_amount: String,
-    payment_total: String,
-    payment_subtotal: String,
-    coinbase_fee: String,
-    network_fee: String,
-    exchange_rate: String,
-    country: String,
-    user_id: String,
-    payment_method: OnrampPaymentMethod,
+    purchase_currency: Option<String>,
+    purchase_network: Option<String>,
+    purchase_amount: Option<CurrencyAmount>,
+    payment_total: Option<CurrencyAmount>,
+    payment_subtotal: Option<CurrencyAmount>,
+    coinbase_fee: Option<CurrencyAmount>,
+    network_fee: Option<CurrencyAmount>,
+    exchange_rate: Option<CurrencyAmount>,
+    country: Option<String>,
+    user_id: Option<String>,
+    payment_method: Option<OnrampPaymentMethod>,
     tx_hash: Option<String>,
-    transaction_id: String,
-    wallet_address: String,
+    transaction_id: Option<String>,
+    wallet_address: Option<String>,
     #[serde(rename = "type")]
     transaction_type: OnrampTransactionType,
+    created_at: Option<String>,
+    completed_at: Option<String>,
+    partner_user_ref: Option<String>,
+    user_type: Option<String>,
+    contract_address: Option<String>,
+    failure_reason: Option<String>,
+    end_partner_name: Option<String>,
+    payment_total_usd: Option<CurrencyAmount>,
 }
 
 pub struct CoinbaseExchange;
@@ -187,7 +226,7 @@ impl CoinbaseExchange {
         let jwt_key =
             generate_coinbase_jwt_key(&pub_key, &priv_key, "GET", COINBASE_API_HOST, path)?;
 
-        let url = format!("https://{}{}", COINBASE_API_HOST, path);
+        let url = format!("https://{COINBASE_API_HOST}{path}");
 
         let res = state
             .http_client
@@ -211,14 +250,14 @@ impl CoinbaseExchange {
         let crypto = CAIP19_TO_COINBASE_CRYPTO
             .get(full_caip19.as_str())
             .ok_or_else(|| {
-                ExchangeError::ValidationError(format!("Unsupported asset: {}", full_caip19))
+                ExchangeError::ValidationError(format!("Unsupported asset: {full_caip19}"))
             })?
             .to_string();
 
         let network = CHAIN_ID_TO_COINBASE_NETWORK
             .get(chain_id.as_str())
             .ok_or_else(|| {
-                ExchangeError::ValidationError(format!("Unsupported chain ID: {}", chain_id))
+                ExchangeError::ValidationError(format!("Unsupported chain ID: {chain_id}"))
             })?
             .to_string();
 
@@ -233,9 +272,10 @@ impl CoinbaseExchange {
         let res = self
             .send_get_request(
                 state,
-                &format!("/onramp/v1/buy/user/{}/transactions", transaction_id),
+                &format!("/onramp/v1/buy/user/{transaction_id}/transactions"),
             )
             .await?;
+
         let body: TransactionStatusResponse = res.json().await.map_err(|e| {
             debug!("Error parsing transaction status response: {:?}", e);
             ExchangeError::InternalError(e.to_string())
@@ -264,16 +304,14 @@ impl CoinbaseExchange {
             params.recipient.clone(),
             vec![network.clone()],
         )]))
-        .map_err(|e| {
-            ExchangeError::InternalError(format!("Failed to serialize addresses: {}", e))
-        })?;
+        .map_err(|e| ExchangeError::InternalError(format!("Failed to serialize addresses: {e}")))?;
 
         let assets = serde_json::to_string(&vec![crypto.clone()]).map_err(|e| {
-            ExchangeError::InternalError(format!("Failed to serialize assets: {}", e))
+            ExchangeError::InternalError(format!("Failed to serialize assets: {e}"))
         })?;
 
         let mut url = Url::parse(COINBASE_ONE_CLICK_BUY_URL)
-            .map_err(|e| ExchangeError::InternalError(format!("Failed to parse URL: {}", e)))?;
+            .map_err(|e| ExchangeError::InternalError(format!("Failed to parse URL: {e}")))?;
 
         url.query_pairs_mut()
             .append_pair("appId", project_id)
@@ -301,15 +339,23 @@ impl CoinbaseExchange {
 
         match response.transactions.first() {
             Some(transaction) => {
-                let status = match transaction.status {
+                let tx_hash = transaction.tx_hash.clone();
+
+                let status = match &transaction.status {
+                    CoinbaseTransactionStatus::Success => {
+                        if tx_hash.as_ref().is_none_or(String::is_empty) {
+                            // It's possible that the transaction is successful
+                            // but the tx_hash is not available yet.
+                            BuyTransactionStatus::InProgress
+                        } else {
+                            BuyTransactionStatus::Success
+                        }
+                    }
                     CoinbaseTransactionStatus::InProgress => BuyTransactionStatus::InProgress,
-                    CoinbaseTransactionStatus::Success => BuyTransactionStatus::Success,
                     CoinbaseTransactionStatus::Failed => BuyTransactionStatus::Failed,
                 };
-                Ok(GetBuyStatusResponse {
-                    status,
-                    tx_hash: transaction.tx_hash.clone(),
-                })
+
+                Ok(GetBuyStatusResponse { status, tx_hash })
             }
             None => Ok(GetBuyStatusResponse {
                 status: BuyTransactionStatus::Unknown,
@@ -339,7 +385,7 @@ fn generate_coinbase_jwt_key(
         .duration_since(UNIX_EPOCH)
         .map_err(|_| ExchangeError::InternalError("Failed to get current time".to_string()))?
         .as_secs() as usize;
-    let uri = format!("{} {}{}", request_method, request_host, request_path);
+    let uri = format!("{request_method} {request_host}{request_path}");
     let claims = Claims {
         iss: "cdp".to_string(),
         nbf: now,
@@ -359,12 +405,12 @@ fn generate_coinbase_jwt_key(
         "typ": "JWT"
     });
     let header = serde_json::to_vec(&header)
-        .map_err(|e| ExchangeError::InternalError(format!("Failed to serialize header: {}", e)))?;
+        .map_err(|e| ExchangeError::InternalError(format!("Failed to serialize header: {e}")))?;
     let header_b64 = BASE64_URL_SAFE_NO_PAD.encode(&header);
     let claims = serde_json::to_vec(&claims)
-        .map_err(|e| ExchangeError::InternalError(format!("Failed to serialize claims: {}", e)))?;
+        .map_err(|e| ExchangeError::InternalError(format!("Failed to serialize claims: {e}")))?;
     let claims_b64 = BASE64_URL_SAFE_NO_PAD.encode(&claims);
-    let message = format!("{}.{}", header_b64, claims_b64);
+    let message = format!("{header_b64}.{claims_b64}");
 
     let secret_bytes = STANDARD
         .decode(key_secret.trim())
@@ -378,5 +424,5 @@ fn generate_coinbase_jwt_key(
     let signature = signing_key.sign(message.as_bytes());
     let signature_b64 = BASE64_URL_SAFE_NO_PAD.encode(signature.to_bytes());
 
-    Ok(format!("{}.{}.{}", header_b64, claims_b64, signature_b64))
+    Ok(format!("{header_b64}.{claims_b64}.{signature_b64}"))
 }

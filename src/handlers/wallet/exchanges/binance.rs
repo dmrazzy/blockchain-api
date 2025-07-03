@@ -19,6 +19,7 @@ pub struct BinanceExchange;
 
 const PRE_ORDER_PATH: &str = "/papi/v1/ramp/connect/buy/pre-order";
 const QUERY_ORDER_DETAILS_PATH: &str = "/papi/v1/ramp/connect/order";
+const FALLBACK_MERCHANT_NAME: &str = " ";
 
 // CAIP-19 asset mappings to Binance assets
 static CAIP19_TO_BINANCE_CRYPTO: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
@@ -40,7 +41,31 @@ static CAIP19_TO_BINANCE_CRYPTO: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
             "USDC",
         ), // USDC on Arbitrum
         ("eip155:1/slip44:60", "ETH"), // Native ETH
-        ("solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ/slip44:501", "SOL"), // Native SOL
+        ("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/slip44:501", "SOL"), // Native SOL
+        (
+            "eip155:1/erc20:0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            "USDT",
+        ), // USDT on Ethereum
+        (
+            "eip155:42161/erc20:0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+            "USDT",
+        ), // USDT on Arbitrum
+        (
+            "eip155:10/erc20:0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
+            "USDT",
+        ), // USDT on Optimism
+        (
+            "eip155:137/erc20:0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+            "USDT",
+        ), // USDT on Polygon
+        (
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+            "USDC",
+        ), // USDC on Solana
+        (
+            "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp/token:Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+            "USDT",
+        ), // USDT on Solana
     ])
 });
 
@@ -52,7 +77,7 @@ static CHAIN_ID_TO_BINANCE_NETWORK: Lazy<HashMap<&str, &str>> = Lazy::new(|| {
         ("eip155:8453", "BASE"),                            // Base
         ("eip155:42161", "ARBITRUM"),                       // Arbitrum
         ("eip155:10", "OPTIMISM"),                          // Optimism
-        ("solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ", "SOL"), // Solana
+        ("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", "SOL"), // Solana
     ])
 });
 
@@ -151,6 +176,13 @@ pub struct PreOrderRequest {
 pub struct Customization {
     send_primary: Option<bool>,
     merchant_display_name: Option<String>,
+    net_receive: Option<bool>,
+    lock_order_attributes: Option<Vec<i32>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+enum LockOrderAttributeType {
+    All = 1,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -263,30 +295,29 @@ impl BinanceExchange {
         private_key: &str,
     ) -> Result<String, ExchangeError> {
         let key_bytes = STANDARD.decode(private_key).map_err(|e| {
-            ExchangeError::GetPayUrlError(format!("Failed to decode private key: {}", e))
+            ExchangeError::GetPayUrlError(format!("Failed to decode private key: {e}"))
         })?;
 
         let pkey = PKey::private_key_from_pkcs8(&key_bytes).map_err(|e| {
-            ExchangeError::GetPayUrlError(format!("Failed to parse private key: {}", e))
+            ExchangeError::GetPayUrlError(format!("Failed to parse private key: {e}"))
         })?;
 
         let data_to_sign = if body.is_empty() || body == "{}" {
             timestamp.to_string()
         } else {
-            format!("{}{}", body, timestamp)
+            format!("{body}{timestamp}")
         };
         debug!("Data to sign: {}", data_to_sign);
 
-        let mut signer = Signer::new(MessageDigest::sha256(), &pkey).map_err(|e| {
-            ExchangeError::GetPayUrlError(format!("Failed to create signer: {}", e))
-        })?;
+        let mut signer = Signer::new(MessageDigest::sha256(), &pkey)
+            .map_err(|e| ExchangeError::GetPayUrlError(format!("Failed to create signer: {e}")))?;
 
-        signer.update(data_to_sign.as_bytes()).map_err(|e| {
-            ExchangeError::GetPayUrlError(format!("Failed to update signer: {}", e))
-        })?;
+        signer
+            .update(data_to_sign.as_bytes())
+            .map_err(|e| ExchangeError::GetPayUrlError(format!("Failed to update signer: {e}")))?;
         let signature = signer
             .sign_to_vec()
-            .map_err(|e| ExchangeError::GetPayUrlError(format!("Failed to sign data: {}", e)))?;
+            .map_err(|e| ExchangeError::GetPayUrlError(format!("Failed to sign data: {e}")))?;
 
         Ok(STANDARD.encode(&signature))
     }
@@ -309,12 +340,12 @@ impl BinanceExchange {
             .as_millis() as u64;
 
         let body = serde_json::to_string(payload).map_err(|e| {
-            ExchangeError::GetPayUrlError(format!("Failed to serialize request body: {}", e))
+            ExchangeError::GetPayUrlError(format!("Failed to serialize request body: {e}"))
         })?;
 
         let signature = self.generate_signature(&body, timestamp, &private_key)?;
 
-        let url = format!("{}{}", host, path);
+        let url = format!("{host}{path}");
 
         let response = state
             .http_client
@@ -333,15 +364,15 @@ impl BinanceExchange {
         let status = response.status();
         if !status.is_success() {
             let error_body = response.text().await.unwrap_or_default();
-            return Err(ExchangeError::InternalError(format!(
-                "Binance API request failed with status: {}, body: {}",
-                status, error_body
-            )));
+            let message =
+                format!("Binance API request failed with status: {status}, body: {error_body}");
+            debug!("Binance API request failed: {}", message);
+            return Err(ExchangeError::InternalError(message));
         }
 
         let parsed_response: BinanceResponse<R> = response.json().await.map_err(|e| {
             debug!("Unable to parse Binance response: {}", e);
-            ExchangeError::InternalError(format!("Failed to parse Binance response: {}", e))
+            ExchangeError::InternalError(format!("Failed to parse Binance response: {e}"))
         })?;
         debug!("Parsed response: {:?}", parsed_response);
         if let Some(success) = parsed_response.success {
@@ -369,14 +400,14 @@ impl BinanceExchange {
         let crypto = CAIP19_TO_BINANCE_CRYPTO
             .get(full_caip19.as_str())
             .ok_or_else(|| {
-                ExchangeError::ValidationError(format!("Unsupported asset: {}", full_caip19))
+                ExchangeError::ValidationError(format!("Unsupported asset: {full_caip19}"))
             })?
             .to_string();
 
         let network = CHAIN_ID_TO_BINANCE_NETWORK
             .get(chain_id.as_str())
             .ok_or_else(|| {
-                ExchangeError::ValidationError(format!("Unsupported chain ID: {}", chain_id))
+                ExchangeError::ValidationError(format!("Unsupported chain ID: {chain_id}"))
             })?
             .to_string();
 
@@ -391,6 +422,21 @@ impl BinanceExchange {
         let (crypto_currency, network) = self
             .map_asset_to_binance_format(&params.asset)
             .map_err(|e| ExchangeError::ValidationError(e.to_string()))?;
+
+        let project = state
+            .registry
+            .project_data(&params.project_id)
+            .await
+            .map_err(|e| {
+                debug!("Failed to get project data: {}", e);
+                ExchangeError::InternalError(format!("Failed to get project data: {e}"))
+            })?;
+        let project_name = if project.project_data.name.is_empty() {
+            debug!("Project name is empty, using fallback name");
+            FALLBACK_MERCHANT_NAME.to_string()
+        } else {
+            project.project_data.name
+        };
 
         let request = PreOrderRequest {
             external_order_id: params.session_id,
@@ -410,7 +456,9 @@ impl BinanceExchange {
             client_type: None,
             customization: Some(Customization {
                 send_primary: Some(true),
-                merchant_display_name: Some("Reown".to_string()),
+                merchant_display_name: Some(project_name),
+                net_receive: Some(true),
+                lock_order_attributes: Some(vec![2, 3]),
             }),
         };
 

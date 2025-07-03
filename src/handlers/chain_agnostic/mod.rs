@@ -23,6 +23,7 @@ use {
 
 pub mod assets;
 pub mod lifi;
+pub mod nonce_manager;
 pub mod route;
 pub mod status;
 
@@ -143,8 +144,7 @@ pub async fn get_balances_of_all_source_tokens(
                             .map_err(|e| {
                                 RpcError::CryptoUitlsError(
                                     crate::utils::crypto::CryptoUitlsError::ProviderError(format!(
-                                        "Failed to get solana token account balance: {}",
-                                        e
+                                        "Failed to get solana token account balance: {e}"
                                     )),
                                 )
                             })?
@@ -153,8 +153,7 @@ pub async fn get_balances_of_all_source_tokens(
                             .map_err(|e| {
                                 RpcError::CryptoUitlsError(
                                     crate::utils::crypto::CryptoUitlsError::ProviderError(format!(
-                                        "Failed to parse solana token account balance: {}",
-                                        e
+                                        "Failed to parse solana token account balance: {e}"
                                     )),
                                 )
                             })?,
@@ -361,8 +360,7 @@ pub async fn get_assets_changes_from_simulation(
                 .get(&chain_id)
                 .ok_or_else(|| {
                     RpcError::InvalidConfiguration(format!(
-                        "Contract balance storage slot for simulation is not present for {} on {}",
-                        asset_name, chain_id
+                        "Contract balance storage slot for simulation is not present for {asset_name} on {chain_id}"
                     ))
                 })?;
             account_state.insert(
