@@ -230,4 +230,58 @@ describe('Account balance', () => {
       expect(typeof item.iconUrl).toBe('string')
     }
   })
+
+  it('Rootstock mainnet balance with specific tokens', async () => {
+    // Test the Rootstock mainnet exception for specific tokens
+    // Using an address that holds RIF, STRIF, or USDRIF tokens
+    const rootstock_chain_id = 'eip155:30'
+    const endpoint = `/v1/account/${fulfilled_eth_address}/balance`;
+    const queryParams = `?projectId=${projectId}&currency=${currency}&chainId=${rootstock_chain_id}&sv=${sdk_version}`;
+    const url = `${baseUrl}${endpoint}${queryParams}`;
+    
+    let resp: any = await httpClient.get(url, withOriginHeader());
+    
+    expect(resp.status).toBe(200)
+    expect(typeof resp.data.balances).toBe('object')
+    expect(Array.isArray(resp.data.balances)).toBe(true)
+
+    // Verify the response structure for each token in the balance
+    for (const item of resp.data.balances) {
+      expect(typeof item.name).toBe('string')
+      expect(typeof item.symbol).toBe('string')
+      expect(item.chainId).toBe(rootstock_chain_id)
+      
+      // Verify address is in CAIP-10 format for Rootstock mainnet
+      expect(item.address).toEqual(expect.stringMatching(new RegExp(`^${rootstock_chain_id}:0x[0-9a-fA-F]{40}$`)))
+      
+      // Verify the token is one of the expected Rootstock tokens
+      const expectedTokens = [
+        `${rootstock_chain_id}:0x2AcC95758f8b5F583470ba265EB685a8F45fC9D5`, // RIF
+        `${rootstock_chain_id}:0x5Db91E24BD32059584bbdB831a901F1199f3D459`, // STRIF
+        `${rootstock_chain_id}:0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37`, // USDRIF
+      ]
+      expect(expectedTokens).toContain(item.address)
+      
+      expect(typeof item.price).toBe('number')
+      expect(typeof item.value).toBe('number')
+      expect(typeof item.quantity).toBe('object')
+      expect(typeof item.quantity.decimals).toBe('string')
+      expect(typeof item.quantity.numeric).toBe('string')
+      expect(typeof item.iconUrl).toBe('string')
+    }
+  })
+
+  it('Rootstock testnet returns empty balance', async () => {
+    // Verify that Rootstock testnet still returns empty balances
+    const rootstock_testnet_chain_id = 'eip155:31'
+    const endpoint = `/v1/account/${fulfilled_eth_address}/balance`;
+    const queryParams = `?projectId=${projectId}&currency=${currency}&chainId=${rootstock_testnet_chain_id}&sv=${sdk_version}`;
+    const url = `${baseUrl}${endpoint}${queryParams}`;
+    
+    let resp: any = await httpClient.get(url, withOriginHeader());
+    
+    expect(resp.status).toBe(200)
+    expect(typeof resp.data.balances).toBe('object')
+    expect(resp.data.balances).toHaveLength(0)
+  })
 })

@@ -17,9 +17,10 @@ use {
     },
     deadpool_redis::{redis::AsyncCommands, Pool},
     ethers::{abi::Address, types::H160},
+    futures_util::future::join_all,
     hyper::HeaderMap,
     serde::{Deserialize, Serialize},
-    std::{net::SocketAddr, sync::Arc, time::Duration},
+    std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration},
     tap::TapFallible,
     tracing::log::{debug, error},
     wc::metrics::{future_metrics, FutureExt},
@@ -125,6 +126,224 @@ pub async fn set_cached_balance(
     }
 }
 
+// Rootstock mainnet specific token addresses to fetch balances for
+// when the chain_id is ROOTSTOCK_MAINNET_CHAIN_ID
+// TODO: Remove this once Dune Rootstock support is fixed.
+const ROOTSTOCK_MAINNET_TOKENS: [&str; 3] = [
+    "0x2AcC95758f8b5F583470ba265EB685a8F45fC9D5", // RIF
+    "0x5Db91E24BD32059584bbdB831a901F1199f3D459", // STRIF
+    "0x3A15461d8aE0F0Fb5Fa2629e9DA7D66A794a6e37", // USDRIF
+];
+
+// Hardcoded metadata for Rootstock tokens
+struct RootstockTokenMetadata {
+    name: &'static str,
+    symbol: &'static str,
+    decimals: u8,
+    icon_url: &'static str,
+}
+
+fn get_rootstock_token_metadata(contract_address: &str) -> RootstockTokenMetadata {
+    match contract_address.to_lowercase().as_str() {
+        "0x2acc95758f8b5f583470ba265eb685a8f45fc9d5" => RootstockTokenMetadata {
+            name: "Rootstock Infrastructure Framework",
+            symbol: "RIF",
+            decimals: 18,
+            icon_url: "https://assets.coingecko.com/coins/images/7460/small/rif-token.png",
+        },
+        "0x5db91e24bd32059584bbdb831a901f1199f3d459" => RootstockTokenMetadata {
+            name: "Staked RIF",
+            symbol: "stRIF",
+            decimals: 18,
+            // stRIF uses RIF icon as base (stRIF not yet listed on CoinGecko)
+            icon_url: "https://assets.coingecko.com/coins/images/7460/small/rif-token.png",
+        },
+        "0x3a15461d8ae0f0fb5fa2629e9da7d66a794a6e37" => RootstockTokenMetadata {
+            name: "RIF US Dollar",
+            symbol: "USDRIF",
+            decimals: 18,
+            // USDRIF uses USD icon (USDRIF not yet listed on CoinGecko)
+            icon_url: "https://assets.coingecko.com/coins/images/6319/small/usdc.png",
+        },
+        _ => RootstockTokenMetadata {
+            name: "Unknown Token",
+            symbol: "UNKNOWN",
+            decimals: 18,
+            icon_url: "",
+        },
+    }
+}
+
+/// Fetch balances for specific tokens on Rootstock mainnet
+/// TODO: Remove this once Dune Rootstock support is fixed.
+#[tracing::instrument(skip_all, level = "debug")]
+async fn fetch_rootstock_mainnet_balances(
+    address: &str,
+    currency: &SupportedCurrencies,
+    state: &Arc<AppState>,
+) -> Result<BalanceResponseBody, RpcError> {
+    let rpc_project_id = state
+        .config
+        .server
+        .testing_project_id
+        .as_ref()
+        .ok_or_else(|| {
+            RpcError::InvalidConfiguration(
+                "Missing testing project id in the configuration for the balance RPC lookups"
+                    .to_string(),
+            )
+        })?;
+
+    let parsed_address = address
+        .parse::<Address>()
+        .map_err(|_| RpcError::InvalidAddress)?;
+
+    // Fetch all token balances in parallel
+    let balance_futures = ROOTSTOCK_MAINNET_TOKENS.iter().map(|contract_address_str| {
+        let contract_address = contract_address_str.parse::<Address>();
+        async move {
+            let contract_address = contract_address.map_err(|_| RpcError::InvalidAddress)?;
+
+            // Fetch balance using JSON-RPC
+            let balance = crypto::get_erc20_balance(
+                ROOTSTOCK_MAINNET_CHAIN_ID,
+                contract_address,
+                parsed_address,
+                rpc_project_id,
+                MessageSource::Balance,
+                None,
+            )
+            .await
+            .tap_err(|e| {
+                error!(
+                    "Failed to fetch balance for contract {contract_address_str} on Rootstock: {e}"
+                );
+            })?;
+
+            Ok::<_, RpcError>((*contract_address_str, balance))
+        }
+    });
+
+    let balance_results = join_all(balance_futures).await;
+
+    // Fetch prices in parallel for tokens with non-zero balance
+    // Clone Arc once outside the loop to reduce refcount operations
+    let state_clone = state.clone();
+    let currency_clone = currency.clone();
+
+    let price_futures = balance_results
+        .iter()
+        .flatten()
+        .filter(|(_, balance)| !balance.is_zero())
+        .map(|(contract_address_str, _)| {
+            let state = state_clone.clone();
+            let currency = currency_clone.clone();
+            let contract_address_str = *contract_address_str;
+            async move {
+                let price = match state
+                    .providers
+                    .fungible_price_providers
+                    .get(&crypto::CaipNamespaces::Rootstock)
+                {
+                    Some(get_price_info_provider) => {
+                        // Parse chain ID once, fall back to 0.0 on error
+                        let chain_id = match crypto::disassemble_caip2(ROOTSTOCK_MAINNET_CHAIN_ID)
+                            .map(|(_, chain_id)| chain_id)
+                        {
+                            Ok(id) => id,
+                            Err(_) => {
+                                debug!("Failed to parse Rootstock chain ID, using 0.0");
+                                return (contract_address_str, 0.0);
+                            }
+                        };
+
+                        match get_price_info_provider
+                            .get_price(
+                                &chain_id,
+                                contract_address_str,
+                                &currency,
+                                &state.providers.token_metadata_cache,
+                                state.metrics.clone(),
+                            )
+                            .await
+                        {
+                            Ok(get_price_info) => get_price_info
+                                .fungibles
+                                .first()
+                                .map(|token_info| token_info.price)
+                                .unwrap_or_else(|| {
+                                    debug!("No price info found for {contract_address_str}, using 0.0");
+                                    0.0
+                                }),
+                            Err(e) => {
+                                debug!("Failed to get price for {contract_address_str} on Rootstock: {e}, using 0.0");
+                                0.0
+                            }
+                        }
+                    }
+                    None => {
+                        debug!("No price provider available for Rootstock, using 0.0");
+                        0.0
+                    }
+                };
+                (contract_address_str, price)
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let price_results = join_all(price_futures).await;
+
+    // Build HashMap of prices by contract address for O(1) lookup
+    let price_map: HashMap<&str, f64> = price_results.into_iter().collect();
+
+    // Build the balances vector
+    let mut balances = Vec::new();
+
+    for result in balance_results {
+        match result {
+            Ok((contract_address_str, balance)) => {
+                // Skip tokens with zero balance
+                if balance.is_zero() {
+                    continue;
+                }
+
+                // Get hardcoded token metadata
+                let metadata = get_rootstock_token_metadata(contract_address_str);
+
+                // Look up the price from the HashMap (defaults to 0.0 if not found)
+                let price = price_map.get(contract_address_str).copied().unwrap_or(0.0);
+
+                // Construct the balance item for the token
+                balances.push(BalanceItem {
+                    name: metadata.name.to_string(),
+                    symbol: metadata.symbol.to_string(),
+                    chain_id: Some(ROOTSTOCK_MAINNET_CHAIN_ID.to_string()),
+                    address: Some(format!(
+                        "{}:{}",
+                        ROOTSTOCK_MAINNET_CHAIN_ID, contract_address_str
+                    )),
+                    value: Some(crypto::convert_token_amount_to_value(
+                        balance,
+                        price,
+                        metadata.decimals,
+                    )),
+                    price,
+                    quantity: BalanceQuantity {
+                        decimals: metadata.decimals.to_string(),
+                        numeric: crypto::format_token_amount(balance, metadata.decimals),
+                    },
+                    icon_url: metadata.icon_url.to_string(),
+                });
+            }
+            Err(e) => {
+                debug!("Failed to fetch balance for a Rootstock token: {e}");
+            }
+        }
+    }
+
+    Ok(BalanceResponseBody { balances })
+}
+
 pub async fn handler(
     state: State<Arc<AppState>>,
     query: Query<BalanceQueryParams>,
@@ -191,13 +410,18 @@ async fn handler_internal(
     }
 
     // TODO: Remove this once Dune Rootstock support is fixed
-    // Return an empty balance response for Rootstock until then
-    // Cover Rootstock mainnet and testnet
-    if query.chain_id.as_deref().is_some_and(|chain_id| {
-        chain_id == ROOTSTOCK_MAINNET_CHAIN_ID || chain_id == ROOTSTOCK_TESTNET_CHAIN_ID
-    }) {
-        debug!("Temporary responding with an empty balance array for Rootstock");
+    // Return an empty balance response for Rootstock testnet until then
+    if query.chain_id.as_deref() == Some(ROOTSTOCK_TESTNET_CHAIN_ID) {
+        debug!("Temporary responding with an empty balance array for Rootstock testnet");
         return Ok(Json(BalanceResponseBody { balances: vec![] }));
+    }
+
+    // Handle Rootstock mainnet with specific tokens
+    if query.chain_id.as_deref() == Some(ROOTSTOCK_MAINNET_CHAIN_ID) {
+        debug!("Fetching Rootstock mainnet balances for specific tokens");
+        let rootstock_response =
+            fetch_rootstock_mainnet_balances(&address, &query.currency, &state).await?;
+        return Ok(Json(rootstock_response));
     }
 
     // Get the cached balance and return it if found except if force_update is needed
