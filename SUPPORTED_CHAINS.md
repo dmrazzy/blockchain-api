@@ -114,10 +114,13 @@ WebSocket RPC **is not recommended for production use**, and may be removed in t
 
 ### Ethereum
 
-| Network            | Chain ID        |
-|--------------------|-----------------|
-| Ethereum           | eip155:1        |
-| Zora               | eip155:7777777  |
+| Network             | Chain ID        |
+|---------------------|-----------------|
+| Ethereum Mainnet    | eip155:1        |
+| Binance Smart Chain | eip155:56       |
+| Polygon Mainnet     | eip155:137      |
+| Base Mainnet        | eip155:8453     |
+| Zora                | eip155:7777777  |
 
 ### Solana
 

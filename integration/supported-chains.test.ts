@@ -9,6 +9,8 @@ describe('Supported chains', () => {
     expect(resp.data.http).toContain('eip155:1')
     expect(resp.data.http).toContain('eip155:8453')
     expect(resp.data.ws).toContain('eip155:1')
-    expect(resp.data.ws).not.toContain('eip155:8453')
+    expect(resp.data.ws).toContain('eip155:8453')
+    // Monad Testnet is not supported in WebSocket RPC
+    expect(resp.data.ws).not.toContain('eip155:10143')
   })
 })
