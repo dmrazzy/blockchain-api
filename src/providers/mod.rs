@@ -172,7 +172,6 @@ mod solscan;
 mod sui;
 mod syndica;
 pub mod tenderly;
-mod therpc;
 mod toncenter;
 mod trongrid;
 mod unichain;
@@ -213,7 +212,6 @@ pub use {
     sui::SuiProvider,
     syndica::{SyndicaProvider, SyndicaWsProvider},
     tenderly::TenderlyProvider,
-    therpc::TheRpcProvider,
     toncenter::{ToncenterApiProvider, ToncenterBalanceProvider},
     trongrid::TrongridProvider,
     unichain::UnichainProvider,
@@ -848,7 +846,6 @@ pub enum ProviderKind {
     Sui,
     Hiro,
     CallStatic,
-    TheRpc,
     Moonbeam,
     Blast,
     Rootstock,
@@ -894,7 +891,6 @@ impl Display for ProviderKind {
                 ProviderKind::Sui => "Sui",
                 ProviderKind::Hiro => "Hiro",
                 ProviderKind::CallStatic => "CallStatic",
-                ProviderKind::TheRpc => "TheRpc",
                 ProviderKind::Moonbeam => "Moonbeam",
                 ProviderKind::Blast => "Blast",
                 ProviderKind::Rootstock => "Rootstock",
@@ -941,7 +937,6 @@ impl ProviderKind {
             "Sui" => Some(Self::Sui),
             "Hiro" => Some(Self::Hiro),
             "CallStatic" => Some(Self::CallStatic),
-            "TheRpc" => Some(Self::TheRpc),
             "Moonbeam" => Some(Self::Moonbeam),
             "Blast" => Some(Self::Blast),
             "Rootstock" => Some(Self::Rootstock),

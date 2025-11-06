@@ -23,7 +23,7 @@ use {
         AllnodesConfig, ArbitrumConfig, AuroraConfig, BaseConfig, BinanceConfig, BlastConfig,
         CallStaticConfig, DrpcConfig, DuneConfig, HiroConfig, MantleConfig, MonadConfig,
         MoonbeamConfig, MorphConfig, NearConfig, PoktConfig, PublicnodeConfig, QuicknodeConfig,
-        RootstockConfig, SolScanConfig, SuiConfig, SyndicaConfig, TheRpcConfig, ToncenterV2Config,
+        RootstockConfig, SolScanConfig, SuiConfig, SyndicaConfig, ToncenterV2Config,
         TrongridConfig, UnichainConfig, WemixConfig, XrplConfig, ZKSyncConfig, ZerionConfig,
         ZoraConfig,
     },
@@ -37,7 +37,7 @@ use {
         GenericProvider, HiroProvider, MantleProvider, MonadProvider, MoonbeamProvider,
         MorphProvider, NearProvider, PoktProvider, ProviderRepository, PublicnodeProvider,
         QuicknodeProvider, QuicknodeWsProvider, RootstockProvider, SolScanProvider, SuiProvider,
-        SyndicaProvider, SyndicaWsProvider, TheRpcProvider, ToncenterApiProvider, TrongridProvider,
+        SyndicaProvider, SyndicaWsProvider, ToncenterApiProvider, TrongridProvider,
         UnichainProvider, WemixProvider, XrplProvider, ZKSyncProvider, ZerionProvider,
         ZoraProvider, ZoraWsProvider,
     },
@@ -642,7 +642,6 @@ fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
         config.blast_api_key.clone(),
     ));
     providers.add_rpc_provider::<MoonbeamProvider, MoonbeamConfig>(MoonbeamConfig::default());
-    providers.add_rpc_provider::<TheRpcProvider, TheRpcConfig>(TheRpcConfig::default());
     providers.add_rpc_provider::<TrongridProvider, TrongridConfig>(TrongridConfig::default());
 
     providers.add_rpc_provider::<ToncenterApiProvider, ToncenterV2Config>(ToncenterV2Config::new(
