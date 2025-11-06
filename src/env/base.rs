@@ -40,7 +40,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:8453".into(),
             (
                 "https://mainnet.base.org".into(),
-                Weight::new(Priority::Normal).unwrap(),
+                Weight::new(Priority::Minimal).unwrap(),
             ),
         ),
         // Base Sepolia

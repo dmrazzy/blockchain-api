@@ -23,13 +23,13 @@ use {
 pub struct AllnodesProvider {
     pub client: reqwest::Client,
     pub supported_chains: HashMap<String, String>,
-    pub api_key: String,
+    pub chain_subdomains: HashMap<String, String>,
 }
 
 #[derive(Debug)]
 pub struct AllnodesWsProvider {
     pub supported_chains: HashMap<String, String>,
-    pub api_key: String,
+    pub chain_subdomains: HashMap<String, String>,
 }
 
 impl Provider for AllnodesWsProvider {
@@ -54,13 +54,20 @@ impl RpcWsProvider for AllnodesWsProvider {
         ws: WebSocketUpgrade,
         query_params: RpcQueryParams,
     ) -> RpcResult<Response> {
-        let chain = &self
+        let chain_id = &query_params.chain_id;
+        let project_id = query_params.project_id;
+        let token = &self
             .supported_chains
-            .get(&query_params.chain_id)
+            .get(chain_id)
             .ok_or(RpcError::ChainNotFound)?;
 
-        let project_id = query_params.project_id;
-        let uri = format!("wss://{}.allnodes.me:8546/{}", chain, &self.api_key);
+        let chain_subdomain =
+            self.chain_subdomains
+                .get(chain_id)
+                .ok_or(RpcError::InvalidConfiguration(format!(
+                    "Allnodes wss subdomain not found for chainId: {chain_id}"
+                )))?;
+        let uri = format!("wss://{chain_subdomain}.allnodes.me:8546/{token}");
         let (websocket_provider, _) = async_tungstenite::tokio::connect_async(uri)
             .await
             .map_err(|e| RpcError::WebSocketError(e.to_string()))?;
@@ -107,12 +114,20 @@ impl RateLimited for AllnodesProvider {
 impl RpcProvider for AllnodesProvider {
     #[tracing::instrument(skip(self, body), fields(provider = %self.provider_kind()), level = "debug")]
     async fn proxy(&self, chain_id: &str, body: bytes::Bytes) -> RpcResult<Response> {
-        let chain = &self
+        let token = &self
             .supported_chains
             .get(chain_id)
             .ok_or(RpcError::ChainNotFound)?;
 
-        let uri = format!("https://{}.allnodes.me:8545/{}", chain, &self.api_key);
+        // Get the chain subdomain
+        let chain_subdomain =
+            self.chain_subdomains
+                .get(chain_id)
+                .ok_or(RpcError::InvalidConfiguration(format!(
+                    "Allnodes subdomain not found for chainId: {chain_id}"
+                )))?;
+
+        let uri = format!("https://{chain_subdomain}.allnodes.me:8545/{token}");
 
         let response = self
             .client
@@ -140,11 +155,12 @@ impl RpcProviderFactory<AllnodesConfig> for AllnodesProvider {
             .iter()
             .map(|(k, v)| (k.clone(), v.0.clone()))
             .collect();
+        let chain_subdomains = provider_config.chain_subdomains.clone();
 
         AllnodesProvider {
             client: forward_proxy_client,
             supported_chains,
-            api_key: provider_config.api_key.clone(),
+            chain_subdomains,
         }
     }
 }
@@ -157,10 +173,11 @@ impl RpcProviderFactory<AllnodesConfig> for AllnodesWsProvider {
             .iter()
             .map(|(k, v)| (k.clone(), v.0.clone()))
             .collect();
+        let chain_subdomains = provider_config.chain_subdomains.clone();
 
         AllnodesWsProvider {
             supported_chains,
-            api_key: provider_config.api_key.clone(),
+            chain_subdomains,
         }
     }
 }

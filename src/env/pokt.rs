@@ -61,7 +61,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Base mainnet
         (
             "eip155:8453".into(),
-            ("base".into(), Weight::new(Priority::Normal).unwrap()),
+            ("base".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Base Sepolia
         (
@@ -74,7 +74,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Binance Smart Chain
         (
             "eip155:56".into(),
-            ("bsc".into(), Weight::new(Priority::Max).unwrap()),
+            ("bsc".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Ethereum mainnet
         (
@@ -129,7 +129,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Polygon
         (
             "eip155:137".into(),
-            ("polygon".into(), Weight::new(Priority::Normal).unwrap()),
+            ("polygon".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         (
             "eip155:1101".into(),

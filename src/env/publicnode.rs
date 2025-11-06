@@ -70,7 +70,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Base mainnet
         (
             "eip155:8453".into(),
-            ("base-rpc".into(), Weight::new(Priority::High).unwrap()),
+            ("base-rpc".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Base Sepolia
         (
@@ -83,7 +83,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Binance Smart Chain mainnet
         (
             "eip155:56".into(),
-            ("bsc-rpc".into(), Weight::new(Priority::High).unwrap()),
+            ("bsc-rpc".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Binance Smart Chain testnet
         (
@@ -114,7 +114,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
             "eip155:137".into(),
             (
                 "polygon-bor-rpc".into(),
-                Weight::new(Priority::Normal).unwrap(),
+                Weight::new(Priority::Minimal).unwrap(),
             ),
         ),
         // Polygon bor amoy testnet

@@ -43,12 +43,12 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // BSC
         (
             "eip155:56".into(),
-            ("bsc".into(), Weight::new(Priority::Normal).unwrap()),
+            ("bsc".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Polygon
         (
             "eip155:137".into(),
-            ("polygon".into(), Weight::new(Priority::Normal).unwrap()),
+            ("polygon".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Optimism
         (
@@ -58,7 +58,7 @@ fn default_supported_chains() -> HashMap<String, (String, Weight)> {
         // Base
         (
             "eip155:8453".into(),
-            ("base".into(), Weight::new(Priority::Normal).unwrap()),
+            ("base".into(), Weight::new(Priority::Minimal).unwrap()),
         ),
         // Sonic
         (

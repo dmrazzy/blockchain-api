@@ -17,4 +17,31 @@ async fn allnodes_provider(ctx: &mut ServerContext) {
         "0x1",
     )
     .await;
+
+    // Base Mainnet
+    check_if_rpc_is_responding_correctly_for_supported_chain(
+        ctx,
+        &provider_kind,
+        "eip155:8453",
+        "0x2105",
+    )
+    .await;
+
+    // BSC Mainnet
+    check_if_rpc_is_responding_correctly_for_supported_chain(
+        ctx,
+        &provider_kind,
+        "eip155:56",
+        "0x38",
+    )
+    .await;
+
+    // Polygon Mainnet
+    check_if_rpc_is_responding_correctly_for_supported_chain(
+        ctx,
+        &provider_kind,
+        "eip155:137",
+        "0x89",
+    )
+    .await;
 }

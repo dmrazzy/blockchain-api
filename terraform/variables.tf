@@ -194,7 +194,7 @@ variable "validate_project_id" {
 }
 
 variable "allnodes_api_key" {
-  description = "Allnodes API key"
+  description = "Allnodes API access tokens in JSON format"
   type        = string
   sensitive   = true
 }

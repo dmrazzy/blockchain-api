@@ -75,9 +75,15 @@ fn extract_supported_chains_and_subdomains(
         ),
         (
             "eip155:8453",
-            ("indulgent-methodical-emerald.base-mainnet", Priority::Low),
+            (
+                "indulgent-methodical-emerald.base-mainnet",
+                Priority::Minimal,
+            ),
         ),
-        ("eip155:56", ("muddy-compatible-general.bsc", Priority::Low)),
+        (
+            "eip155:56",
+            ("muddy-compatible-general.bsc", Priority::Minimal),
+        ),
         (
             "eip155:8217",
             ("sleek-solitary-telescope.kaia-mainnet", Priority::Low),
@@ -96,7 +102,7 @@ fn extract_supported_chains_and_subdomains(
         ),
         (
             "eip155:137",
-            ("chaotic-wandering-fire.matic", Priority::Low),
+            ("chaotic-wandering-fire.matic", Priority::Minimal),
         ),
         (
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
