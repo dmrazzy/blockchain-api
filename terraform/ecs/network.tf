@@ -50,6 +50,50 @@ resource "aws_lb_listener_certificate" "listener-https" {
   certificate_arn = each.value
 }
 
+# Block specific project IDs (query string parameter) at the ALB level
+# Uses stable priority assignment based on list index to avoid conflicts
+# Starts at priority 100 to reserve 1-99 for future high-priority rules
+# Matches common case variations: projectId, projectid, ProjectId, PROJECTID
+# Limited to 100 rules.
+resource "aws_lb_listener_rule" "block_project_ids" {
+  for_each     = { for idx, id in nonsensitive(var.alb_blocked_project_ids) : id => idx }
+  listener_arn = aws_lb_listener.listener-https.arn
+  priority     = each.value + 100
+
+  condition {
+    query_string {
+      key   = "projectId"
+      value = each.key
+    }
+    query_string {
+      key   = "projectid"
+      value = each.key
+    }
+    query_string {
+      key   = "ProjectId"
+      value = each.key
+    }
+    query_string {
+      key   = "PROJECTID"
+      value = each.key
+    }
+  }
+
+  action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "application/json"
+      status_code  = "429"
+      message_body = "{\"error\":\"Custom rate limited. Please contact Reown.com support.\"}"
+    }
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 resource "aws_lb_listener" "listener-http" {
   load_balancer_arn = aws_lb.load_balancer.arn
   port              = "80"

@@ -482,6 +482,15 @@ variable "balances_denylist_project_ids" {
 }
 
 #-------------------------------------------------------------------------------
+# ALB Project ID Blacklist
+variable "alb_blocked_project_ids" {
+  description = "List of project IDs to block at the ALB level"
+  type        = list(string)
+  default     = []
+  sensitive   = true
+}
+
+#-------------------------------------------------------------------------------
 # Exchanges
 
 variable "coinbase_project_id" {
