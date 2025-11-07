@@ -51,31 +51,45 @@ resource "aws_lb_listener_certificate" "listener-https" {
 }
 
 # Block specific project IDs (query string parameter) at the ALB level
+# Creates 3 rules per project ID to handle common case variations
 # Uses stable priority assignment based on list index to avoid conflicts
 # Starts at priority 100 to reserve 1-99 for future high-priority rules
-# Matches common case variations: projectId, projectid, ProjectId, PROJECTID
-# Limited to 100 rules.
+# Default ALB limit is 100 rules but can be increased via AWS support
+locals {
+  # Create a flattened list of all project ID + case variation combinations
+  blocked_project_combinations = flatten([
+    for idx, project_id in var.alb_blocked_project_ids : [
+      {
+        key           = "${project_id}-projectId"
+        project_id    = project_id
+        param_name    = "projectId"
+        base_priority = idx * 3
+      },
+      {
+        key           = "${project_id}-projectid"
+        project_id    = project_id
+        param_name    = "projectid"
+        base_priority = idx * 3 + 1
+      },
+      {
+        key           = "${project_id}-ProjectId"
+        project_id    = project_id
+        param_name    = "ProjectId"
+        base_priority = idx * 3 + 2
+      }
+    ]
+  ])
+}
+
 resource "aws_lb_listener_rule" "block_project_ids" {
-  for_each     = { for idx, id in nonsensitive(var.alb_blocked_project_ids) : id => idx }
+  for_each     = { for combo in nonsensitive(local.blocked_project_combinations) : combo.key => combo }
   listener_arn = aws_lb_listener.listener-https.arn
-  priority     = each.value + 100
+  priority     = each.value.base_priority + 100
 
   condition {
     query_string {
-      key   = "projectId"
-      value = each.key
-    }
-    query_string {
-      key   = "projectid"
-      value = each.key
-    }
-    query_string {
-      key   = "ProjectId"
-      value = each.key
-    }
-    query_string {
-      key   = "PROJECTID"
-      value = each.key
+      key   = each.value.param_name
+      value = each.value.project_id
     }
   }
 
