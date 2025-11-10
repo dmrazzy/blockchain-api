@@ -5,7 +5,7 @@ use {
         },
         project::ProjectDataError,
         storage::{error::StorageError, irn},
-        utils::crypto::{CaipNamespaces, CryptoUitlsError},
+        utils::crypto::{CaipNamespaces, CryptoUtilsError},
     },
     axum::{response::IntoResponse, Json},
     cerberus::registry::RegistryError,
@@ -21,7 +21,7 @@ pub enum RpcError {
     EnvyError(#[from] envy::Error),
 
     #[error(transparent)]
-    CryptoUitlsError(#[from] CryptoUitlsError),
+    CryptoUtilsError(#[from] CryptoUtilsError),
 
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
@@ -322,7 +322,7 @@ impl IntoResponse for RpcError {
                     )),
                 )
                     .into_response(),
-            Self::CryptoUitlsError(e) => (
+            Self::CryptoUtilsError(e) => (
                 StatusCode::BAD_REQUEST,
                 Json(new_error_response(
                     "".to_string(),

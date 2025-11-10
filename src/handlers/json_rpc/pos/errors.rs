@@ -1,4 +1,4 @@
-use {crate::utils::crypto::CryptoUitlsError, thiserror::Error};
+use {crate::utils::crypto::CryptoUtilsError, thiserror::Error};
 
 #[derive(Debug, Error)]
 pub enum InternalError {
@@ -174,7 +174,7 @@ pub enum TransactionIdError {
     InvalidFormat(String),
 
     #[error("Invalid chain ID: {0}")]
-    InvalidChainId(#[from] CryptoUitlsError),
+    InvalidChainId(#[from] CryptoUtilsError),
 }
 
 impl TransactionIdError {

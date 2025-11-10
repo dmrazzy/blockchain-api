@@ -79,7 +79,7 @@ pub static JSON_RPC_VERSION: once_cell::sync::Lazy<Arc<str>> =
     once_cell::sync::Lazy::new(|| Arc::from(JSON_RPC_VERSION_STR));
 
 #[derive(thiserror::Error, Debug)]
-pub enum CryptoUitlsError {
+pub enum CryptoUtilsError {
     #[error("Namespace is not supported: {0}")]
     WrongNamespace(String),
     #[error("Chain ID format is not supported: {0}")]
@@ -305,10 +305,10 @@ pub enum Erc20FunctionType {
 /// Decodes ERC20 contract call function data and returns the function name.
 pub fn decode_erc20_function_type(
     function_data: &[u8],
-) -> Result<Erc20FunctionType, CryptoUitlsError> {
+) -> Result<Erc20FunctionType, CryptoUtilsError> {
     // Get the 4 bytes function selector
     let selector: [u8; 4] = function_data[0..4].try_into().map_err(|_| {
-        CryptoUitlsError::Erc20DecodeError("Function data is less then 4 bytes.".into())
+        CryptoUtilsError::Erc20DecodeError("Function data is less then 4 bytes.".into())
     })?;
 
     let function_type = match selector {
@@ -318,7 +318,7 @@ pub fn decode_erc20_function_type(
         transferFromCall::SELECTOR => Erc20FunctionType::TransferFrom,
         allowanceCall::SELECTOR => Erc20FunctionType::Allowance,
         _ => {
-            return Err(CryptoUitlsError::Erc20DecodeError(
+            return Err(CryptoUtilsError::Erc20DecodeError(
                 "Unknown function selector.".into(),
             ))
         }
@@ -328,10 +328,10 @@ pub fn decode_erc20_function_type(
 }
 
 /// Decode ERC20 contract transfer data and returns receiver and amount
-pub fn decode_erc20_transfer_data(data: &[u8]) -> Result<(Address, AlloyU256), CryptoUitlsError> {
+pub fn decode_erc20_transfer_data(data: &[u8]) -> Result<(Address, AlloyU256), CryptoUtilsError> {
     // Ensure the function data is at least 4 bytes for the selector
     if data.len() < 4 {
-        return Err(CryptoUitlsError::Erc20DecodeError(
+        return Err(CryptoUtilsError::Erc20DecodeError(
             "ERC20 function data is less than 4 bytes.".into(),
         ));
     }
@@ -339,12 +339,12 @@ pub fn decode_erc20_transfer_data(data: &[u8]) -> Result<(Address, AlloyU256), C
     // Get the 4-byte function selector and check it
     let selector = &data[0..4];
     if selector != transferCall::SELECTOR {
-        return Err(CryptoUitlsError::Erc20DecodeError(
+        return Err(CryptoUtilsError::Erc20DecodeError(
             "ERC20 function data is not a transfer function.".into(),
         ));
     }
     let transfer_params = transferCall::abi_decode(data, false).map_err(|err| {
-        CryptoUitlsError::Erc20DecodeError(format!("Failed to decode ERC20 transfer params: {err}"))
+        CryptoUtilsError::Erc20DecodeError(format!("Failed to decode ERC20 transfer params: {err}"))
     })?;
     Ok((transfer_params.to, transfer_params.value))
 }
@@ -397,7 +397,7 @@ pub async fn verify_message_signature(
     rpc_project_id: &str,
     source: MessageSource,
     session_id: Option<String>,
-) -> Result<bool, CryptoUitlsError> {
+) -> Result<bool, CryptoUtilsError> {
     verify_eip6492_message_signature(
         message,
         signature,
@@ -416,9 +416,9 @@ fn get_rpc_url(
     rpc_project_id: &str,
     source: MessageSource,
     session_id: Option<String>,
-) -> Result<Url, CryptoUitlsError> {
+) -> Result<Url, CryptoUtilsError> {
     let mut provider = Url::parse("https://rpc.walletconnect.org/v1")
-        .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
+        .map_err(|e| CryptoUtilsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
     provider.query_pairs_mut().append_pair("chainId", chain_id);
     provider
         .query_pairs_mut()
@@ -444,19 +444,19 @@ pub async fn verify_eip6492_message_signature(
     rpc_project_id: &str,
     source: MessageSource,
     session_id: Option<String>,
-) -> Result<bool, CryptoUitlsError> {
+) -> Result<bool, CryptoUtilsError> {
     let message_hash: [u8; 32] = get_message_hash(message).into();
     let address = Address::parse_checksummed(address, None)
-        .map_err(|_| CryptoUitlsError::AddressChecksum(address.into()))?;
+        .map_err(|_| CryptoUtilsError::AddressChecksum(address.into()))?;
 
     let provider = get_rpc_url(chain_id, rpc_project_id, source, session_id)?;
     let hexed_signature = hex::decode(&signature[2..])
-        .map_err(|e| CryptoUitlsError::SignatureFormat(format!("Wrong signature format: {e}")))?;
+        .map_err(|e| CryptoUtilsError::SignatureFormat(format!("Wrong signature format: {e}")))?;
 
     match verify_eip6492(hexed_signature, address, &message_hash, provider).await {
         Ok(_) => Ok(true),
         Err(CacaoError::Verification) => Ok(false),
-        Err(e) => Err(CryptoUitlsError::ContractCallError(format!(
+        Err(e) => Err(CryptoUtilsError::ContractCallError(format!(
             "Failed to verify EIP-6492 signature: {e}"
         ))),
     }
@@ -501,7 +501,7 @@ pub async fn get_erc20_balance(
     rpc_project_id: &str,
     source: MessageSource,
     session_id: Option<String>,
-) -> Result<U256, CryptoUitlsError> {
+) -> Result<U256, CryptoUtilsError> {
     // Use JSON-RPC call for the balance of the native ERC20 tokens
     // or call the contract for the custom ERC20 tokens
     let balance = if contract == H160::repeat_byte(0xee) {
@@ -530,7 +530,7 @@ pub async fn get_erc20_contract_balance(
     rpc_project_id: &str,
     source: MessageSource,
     session_id: Option<String>,
-) -> Result<U256, CryptoUitlsError> {
+) -> Result<U256, CryptoUtilsError> {
     abigen!(
         ERC20Contract,
         r#"[
@@ -541,12 +541,12 @@ pub async fn get_erc20_contract_balance(
     let provider = EthersProvider::<Http>::try_from(
         get_rpc_url(chain_id, rpc_project_id, source, session_id)?.as_str(),
     )
-    .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
+    .map_err(|e| CryptoUtilsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
     let provider = Arc::new(provider);
 
     let contract = ERC20Contract::new(contract, provider);
     let balance = contract.balance_of(wallet).call().await.map_err(|e| {
-        CryptoUitlsError::ContractCallError(format!(
+        CryptoUtilsError::ContractCallError(format!(
             "Failed to call ERC20 contract {contract:?} in {chain_id:?} for the balance of {wallet:?}.\
             The error: {e}"
         ))
@@ -562,17 +562,17 @@ pub async fn get_balance(
     rpc_project_id: &str,
     source: MessageSource,
     session_id: Option<String>,
-) -> Result<U256, CryptoUitlsError> {
+) -> Result<U256, CryptoUtilsError> {
     let provider = EthersProvider::<Http>::try_from(
         get_rpc_url(chain_id, rpc_project_id, source, session_id)?.as_str(),
     )
-    .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
+    .map_err(|e| CryptoUtilsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
     let provider = Arc::new(provider);
 
     let balance = provider
         .get_balance(wallet, None)
         .await
-        .map_err(|e| CryptoUitlsError::ProviderError(format!("{e}")))?;
+        .map_err(|e| CryptoUtilsError::ProviderError(format!("{e}")))?;
     Ok(balance)
 }
 
@@ -582,11 +582,11 @@ pub async fn get_gas_price(
     chain_id: &str,
     rpc_project_id: &str,
     provider: &impl Provider,
-) -> Result<u128, CryptoUitlsError> {
+) -> Result<u128, CryptoUtilsError> {
     let gas_price = provider
         .get_gas_price()
         .await
-        .map_err(|e| CryptoUitlsError::ProviderError(format!("{e}")))?;
+        .map_err(|e| CryptoUtilsError::ProviderError(format!("{e}")))?;
     Ok(gas_price)
 }
 
@@ -595,12 +595,12 @@ pub async fn get_gas_price(
 pub async fn get_nonce(
     wallet: Address,
     provider: &impl Provider,
-) -> Result<AlloyU64, CryptoUitlsError> {
+) -> Result<AlloyU64, CryptoUtilsError> {
     let nonce = provider
         .get_transaction_count(wallet)
         .pending()
         .await
-        .map_err(|e| CryptoUitlsError::ProviderError(format!("{e}")))?;
+        .map_err(|e| CryptoUtilsError::ProviderError(format!("{e}")))?;
     Ok(AlloyU64::from(nonce))
 }
 
@@ -614,7 +614,7 @@ pub async fn get_gas_estimate(
     value: AlloyU256,
     input: AlloyBytes,
     provider: &impl Provider,
-) -> Result<u64, CryptoUitlsError> {
+) -> Result<u64, CryptoUtilsError> {
     let gas_estimate = provider
         .estimate_gas(&TransactionRequest {
             from: Some(from),
@@ -627,7 +627,7 @@ pub async fn get_gas_estimate(
             ..Default::default()
         })
         .await
-        .map_err(|e| CryptoUitlsError::ProviderError(format!("{e}")))?;
+        .map_err(|e| CryptoUtilsError::ProviderError(format!("{e}")))?;
     Ok(gas_estimate)
 }
 
@@ -639,7 +639,7 @@ pub async fn call_get_user_op_hash(
     contract_address: H160,
     user_operation: UserOperation,
     session_id: Option<String>,
-) -> Result<[u8; 32], CryptoUitlsError> {
+) -> Result<[u8; 32], CryptoUtilsError> {
     abigen!(
         EntryPoint,
         r#"[
@@ -657,7 +657,7 @@ pub async fn call_get_user_op_hash(
         )?
         .as_str(),
     )
-    .map_err(|e| CryptoUitlsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
+    .map_err(|e| CryptoUtilsError::RpcUrlParseError(format!("Failed to parse RPC url: {e}")))?;
     let provider = Arc::new(provider);
 
     let contract = EntryPoint::new(contract_address, provider);
@@ -680,7 +680,7 @@ pub async fn call_get_user_op_hash(
         .call()
         .await
         .map_err(|e| {
-            CryptoUitlsError::ContractCallError(format!(
+            CryptoUtilsError::ContractCallError(format!(
                 "Failed to call getUserOpHash in EntryPoint contract: {e}"
             ))
         })?;
@@ -954,14 +954,14 @@ pub struct Caip2ChainId {
 
 impl Caip2ChainId {
     /// Create a new Caip2ChainId from namespace and reference parts
-    pub fn new(namespace: &str, reference: &str) -> Result<Self, CryptoUitlsError> {
+    pub fn new(namespace: &str, reference: &str) -> Result<Self, CryptoUtilsError> {
         if !CAIP2_NAMESPACE_REGEX.is_match(namespace) {
-            return Err(CryptoUitlsError::WrongCaip2Format(format!(
+            return Err(CryptoUtilsError::WrongCaip2Format(format!(
                 "CAIP-2 namespace must be 3-8 characters of lowercase letters, digits, or hyphens: {namespace}"
             )));
         }
         if !CAIP2_REFERENCE_REGEX.is_match(reference) {
-            return Err(CryptoUitlsError::WrongChainIdFormat(format!(
+            return Err(CryptoUtilsError::WrongChainIdFormat(format!(
                 "CAIP-2 reference must be 1-32 characters of letters, digits, or hyphens: {reference}"
             )));
         }
@@ -973,17 +973,17 @@ impl Caip2ChainId {
     }
 
     /// Parse a CAIP-2 chain ID string
-    pub fn parse(chain_id: &str) -> Result<Self, CryptoUitlsError> {
+    pub fn parse(chain_id: &str) -> Result<Self, CryptoUtilsError> {
         let mut parts = chain_id.splitn(2, ':');
 
         let namespace = parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip2Format(format!(
+            CryptoUtilsError::WrongCaip2Format(format!(
                 "CAIP-2 chain ID must have a namespace component: {chain_id}"
             ))
         })?;
 
         let reference = parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip2Format(format!(
+            CryptoUtilsError::WrongCaip2Format(format!(
                 "CAIP-2 chain ID must have a reference component: {chain_id}"
             ))
         })?;
@@ -1002,7 +1002,7 @@ impl Caip2ChainId {
 }
 
 impl FromStr for Caip2ChainId {
-    type Err = CryptoUitlsError;
+    type Err = CryptoUtilsError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
@@ -1035,17 +1035,17 @@ impl Caip19Asset {
         asset_namespace: &str,
         asset_reference: &str,
         token_id: Option<&str>,
-    ) -> Result<Self, CryptoUitlsError> {
+    ) -> Result<Self, CryptoUtilsError> {
         // Validate asset namespace format
         if !CAIP19_ASSET_NAMESPACE_REGEX.is_match(asset_namespace) {
-            return Err(CryptoUitlsError::WrongCaip19Format(format!(
+            return Err(CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid asset namespace format (must be 3-8 lowercase alphanumeric or hyphen characters): {asset_namespace}"
             )));
         }
 
         // Validate asset reference format
         if !CAIP19_ASSET_REFERENCE_REGEX.is_match(asset_reference) {
-            return Err(CryptoUitlsError::WrongCaip19Format(format!(
+            return Err(CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid asset reference format (must be 1-128 alphanumeric characters or -,%,.): {asset_reference}"
             )));
         }
@@ -1053,7 +1053,7 @@ impl Caip19Asset {
         // Validate token ID format if present
         if let Some(token_id) = token_id {
             if !CAIP19_TOKEN_ID_REGEX.is_match(token_id) {
-                return Err(CryptoUitlsError::WrongCaip19Format(format!(
+                return Err(CryptoUtilsError::WrongCaip19Format(format!(
                     "Invalid token ID format (must be 1-78 alphanumeric characters or -,%,.): {token_id}"
                 )));
             }
@@ -1078,17 +1078,17 @@ impl Caip19Asset {
     }
 
     /// Parse a CAIP-19 asset ID string
-    pub fn parse(asset_id: &str) -> Result<Self, CryptoUitlsError> {
+    pub fn parse(asset_id: &str) -> Result<Self, CryptoUtilsError> {
         let mut parts = asset_id.splitn(2, '/');
 
         let chain_id_str = parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip19Format(format!(
+            CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid CAIP-19 format (missing chain ID): {asset_id}"
             ))
         })?;
 
         let asset_part = parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip19Format(format!(
+            CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid CAIP-19 format (missing '/'): {asset_id}"
             ))
         })?;
@@ -1097,7 +1097,7 @@ impl Caip19Asset {
 
         let mut asset_parts = asset_part.splitn(2, '/');
         let namespace_ref_part = asset_parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip19Format(format!(
+            CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid CAIP-19 format (missing asset part): {asset_id}"
             ))
         })?;
@@ -1106,13 +1106,13 @@ impl Caip19Asset {
 
         let mut namespace_ref_parts = namespace_ref_part.splitn(2, ':');
         let asset_namespace = namespace_ref_parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip19Format(format!(
+            CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid asset namespace/reference format (missing namespace): {namespace_ref_part}"
             ))
         })?;
 
         let asset_reference = namespace_ref_parts.next().ok_or_else(|| {
-            CryptoUitlsError::WrongCaip19Format(format!(
+            CryptoUtilsError::WrongCaip19Format(format!(
                 "Invalid asset namespace/reference format (missing ':'): {namespace_ref_part}"
             ))
         })?;
@@ -1147,7 +1147,7 @@ impl Caip19Asset {
 }
 
 impl FromStr for Caip19Asset {
-    type Err = CryptoUitlsError;
+    type Err = CryptoUtilsError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
@@ -1176,60 +1176,60 @@ pub fn format_to_caip10(namespace: CaipNamespaces, chain_id: &str, address: &str
 }
 
 /// Disassemble CAIP-2 to namespace and chainId
-pub fn disassemble_caip2(caip2: &str) -> Result<(CaipNamespaces, String), CryptoUitlsError> {
+pub fn disassemble_caip2(caip2: &str) -> Result<(CaipNamespaces, String), CryptoUtilsError> {
     let parts = caip2.split(':').collect::<Vec<&str>>();
     if parts.len() != 2 {
-        return Err(CryptoUitlsError::WrongCaip2Format(caip2.into()));
+        return Err(CryptoUtilsError::WrongCaip2Format(caip2.into()));
     };
     let namespace = match parts.first() {
         Some(namespace) => match namespace.parse::<CaipNamespaces>() {
             Ok(namespace) => namespace,
-            Err(_) => return Err(CryptoUitlsError::WrongNamespace(caip2.into())),
+            Err(_) => return Err(CryptoUtilsError::WrongNamespace(caip2.into())),
         },
-        None => return Err(CryptoUitlsError::WrongNamespace(caip2.into())),
+        None => return Err(CryptoUtilsError::WrongNamespace(caip2.into())),
     };
 
     let chain_id = parts[1].to_string();
     CAIP_CHAIN_ID_REGEX
         .captures(&chain_id)
-        .ok_or(CryptoUitlsError::WrongChainIdFormat(chain_id.clone()))?;
+        .ok_or(CryptoUtilsError::WrongChainIdFormat(chain_id.clone()))?;
     Ok((namespace, chain_id))
 }
 
 /// Disassemble CAIP-10 to namespace, chainId and address (with default CaipNamespaces)
 pub fn disassemble_caip10(
     caip10: &str,
-) -> Result<(CaipNamespaces, String, String), CryptoUitlsError> {
+) -> Result<(CaipNamespaces, String, String), CryptoUtilsError> {
     disassemble_caip10_with_namespace::<CaipNamespaces>(caip10)
 }
 
 /// Disassemble CAIP-10 to namespace, chainId and address (generic version)
 pub fn disassemble_caip10_with_namespace<T>(
     caip10: &str,
-) -> Result<(T, String, String), CryptoUitlsError>
+) -> Result<(T, String, String), CryptoUtilsError>
 where
     T: std::str::FromStr + Clone + NamespaceValidator,
 {
     let parts = caip10.split(':').collect::<Vec<&str>>();
     if parts.len() != 3 {
-        return Err(CryptoUitlsError::WrongCaip10Format(caip10.into()));
+        return Err(CryptoUtilsError::WrongCaip10Format(caip10.into()));
     };
     let namespace = match parts.first() {
         Some(namespace) => match namespace.parse::<T>() {
             Ok(namespace) => namespace,
-            Err(_) => return Err(CryptoUitlsError::WrongNamespace(caip10.into())),
+            Err(_) => return Err(CryptoUtilsError::WrongNamespace(caip10.into())),
         },
-        None => return Err(CryptoUitlsError::WrongNamespace(caip10.into())),
+        None => return Err(CryptoUtilsError::WrongNamespace(caip10.into())),
     };
 
     let chain_id = parts[1].to_string();
     CAIP_CHAIN_ID_REGEX
         .captures(&chain_id)
-        .ok_or(CryptoUitlsError::WrongChainIdFormat(chain_id.clone()))?;
+        .ok_or(CryptoUtilsError::WrongChainIdFormat(chain_id.clone()))?;
 
     let address = parts[2].to_string();
     if !namespace.validate_address(&address) {
-        return Err(CryptoUitlsError::WrongAddressFormat(address.clone()));
+        return Err(CryptoUtilsError::WrongAddressFormat(address.clone()));
     };
 
     Ok((namespace, chain_id, address))
@@ -1300,9 +1300,9 @@ pub fn convert_alloy_address_to_h160(addr: Address) -> H160 {
 
 /// Normalize any Ethereum-style address to its checksummed form.
 /// If invalid, returns Err.
-pub fn normalize_to_checksum(addr: &str) -> Result<String, CryptoUitlsError> {
+pub fn normalize_to_checksum(addr: &str) -> Result<String, CryptoUtilsError> {
     let h160 =
-        H160::from_str(addr).map_err(|_| CryptoUitlsError::WrongAddressFormat(addr.into()))?;
+        H160::from_str(addr).map_err(|_| CryptoUtilsError::WrongAddressFormat(addr.into()))?;
     Ok(to_checksum(&h160, None))
 }
 

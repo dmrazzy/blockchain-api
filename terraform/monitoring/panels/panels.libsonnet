@@ -38,6 +38,7 @@ local redis  = panels.aws.redis;
     rpc_server_error_codes: (import 'proxy/rpc_server_error_codes.libsonnet'    ).new,
     rpc_methods_cache:      (import 'proxy/rpc_methods_cache.libsonnet'         ).new,
     provider_conn_errors:   (import 'proxy/provider_connection_errors.libsonnet').new,
+    rps_per_chain:          (import 'proxy/rps_per_chain.libsonnet'             ).new,
   },
 
   projects: {

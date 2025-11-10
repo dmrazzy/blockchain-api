@@ -142,8 +142,8 @@ pub async fn get_balances_of_all_source_tokens(
                             ))
                             .await
                             .map_err(|e| {
-                                RpcError::CryptoUitlsError(
-                                    crate::utils::crypto::CryptoUitlsError::ProviderError(format!(
+                                RpcError::CryptoUtilsError(
+                                    crate::utils::crypto::CryptoUtilsError::ProviderError(format!(
                                         "Failed to get solana token account balance: {e}"
                                     )),
                                 )
@@ -151,8 +151,8 @@ pub async fn get_balances_of_all_source_tokens(
                             .amount
                             .parse::<U256>()
                             .map_err(|e| {
-                                RpcError::CryptoUitlsError(
-                                    crate::utils::crypto::CryptoUitlsError::ProviderError(format!(
+                                RpcError::CryptoUtilsError(
+                                    crate::utils::crypto::CryptoUtilsError::ProviderError(format!(
                                         "Failed to parse solana token account balance: {e}"
                                     )),
                                 )

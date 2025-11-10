@@ -1,7 +1,7 @@
 use crate::{
     analytics::MessageSource,
     handlers::self_provider::SelfProviderPool,
-    utils::crypto::{get_nonce, CryptoUitlsError},
+    utils::crypto::{get_nonce, CryptoUtilsError},
 };
 use alloy::primitives::{Address, U64};
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ pub struct NonceManager {
 }
 
 enum NonceState {
-    Pending(JoinHandle<Result<U64, CryptoUitlsError>>),
+    Pending(JoinHandle<Result<U64, CryptoUtilsError>>),
     Ready(U64),
 }
 
@@ -46,7 +46,7 @@ impl NonceManager {
         &mut self,
         chain_id: String,
         address: Address,
-    ) -> Result<Result<U64, CryptoUitlsError>, JoinError> {
+    ) -> Result<Result<U64, CryptoUtilsError>, JoinError> {
         let nonce = self
             .nonce_manager
             .get_mut(&(chain_id, address))
