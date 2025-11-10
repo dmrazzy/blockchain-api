@@ -103,6 +103,19 @@ dependencies = [
 [[package]]
 name = "alloc"
 version = "0.1.0"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tikv-jemalloc-ctl",
+ "tikv-jemallocator",
+ "wc_metrics 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0)",
+]
+
+[[package]]
+name = "alloc"
+version = "0.1.0"
 source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
 dependencies = [
  "serde",
@@ -110,7 +123,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tikv-jemalloc-ctl",
  "tikv-jemallocator",
- "wc_metrics",
+ "wc_metrics 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
 ]
 
 [[package]]
@@ -1080,14 +1093,14 @@ dependencies = [
 [[package]]
 name = "analytics"
 version = "0.1.0"
-source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
 dependencies = [
  "anyhow",
  "async-trait",
  "aws-sdk-s3",
  "bytes",
  "chrono",
- "future",
+ "future 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0)",
  "parquet",
  "parquet_derive",
  "tap",
@@ -4518,6 +4531,17 @@ checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 [[package]]
 name = "future"
 version = "0.1.0"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
+dependencies = [
+ "pin-project 1.1.10",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "future"
+version = "0.1.0"
 source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
 dependencies = [
  "pin-project 1.1.10",
@@ -4764,7 +4788,7 @@ dependencies = [
 [[package]]
 name = "geoip"
 version = "0.1.0"
-source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
 dependencies = [
  "aws-sdk-s3",
  "axum-client-ip",
@@ -7771,7 +7795,7 @@ dependencies = [
 [[package]]
 name = "rate_limit"
 version = "0.1.0"
-source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
 dependencies = [
  "chrono",
  "deadpool-redis",
@@ -8245,7 +8269,7 @@ dependencies = [
  "uuid 1.18.1",
  "validator",
  "vergen",
- "wc",
+ "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0)",
  "wcn_client",
  "wiremock",
  "yttrium",
@@ -13090,15 +13114,39 @@ dependencies = [
 [[package]]
 name = "wc"
 version = "0.1.0"
-source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
 dependencies = [
- "alloc",
+ "alloc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0)",
  "analytics",
- "collections",
- "future",
+ "future 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0)",
  "geoip",
  "rate_limit",
- "wc_metrics",
+ "wc_metrics 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0)",
+]
+
+[[package]]
+name = "wc"
+version = "0.1.0"
+source = "git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255#28c12551893d51e291453e24afb2a444310521fa"
+dependencies = [
+ "alloc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
+ "collections",
+ "future 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
+ "wc_metrics 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
+]
+
+[[package]]
+name = "wc_metrics"
+version = "0.1.0"
+source = "git+https://github.com/WalletConnect/utils-rs.git?tag=v0.15.0#dfc15702105cee26bdd29abb2bbc026237cc17ba"
+dependencies = [
+ "arc-swap",
+ "enum-ordinalize",
+ "futures",
+ "metrics 0.23.1",
+ "parking_lot",
+ "pin-project 1.1.10",
+ "smallvec",
 ]
 
 [[package]]
@@ -13133,7 +13181,7 @@ dependencies = [
  "thiserror 2.0.16",
  "tokio",
  "tracing",
- "wc",
+ "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
  "wcn_cluster",
  "wcn_cluster_api",
  "wcn_rpc",
@@ -13171,7 +13219,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
- "wc",
+ "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
  "xxhash-rust",
 ]
 
@@ -13189,7 +13237,7 @@ dependencies = [
  "tap",
  "thiserror 2.0.16",
  "tracing",
- "wc",
+ "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
  "wcn_cluster",
  "wcn_rpc",
 ]
@@ -13227,7 +13275,7 @@ dependencies = [
  "tokio-serde",
  "tokio-util",
  "tracing",
- "wc",
+ "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
  "wcn_rpc_derive",
 ]
 
@@ -13257,7 +13305,7 @@ dependencies = [
  "thiserror 2.0.16",
  "time",
  "tracing",
- "wc",
+ "wc 0.1.0 (git+https://github.com/WalletConnect/utils-rs.git?rev=28c1255)",
  "wcn_rpc",
 ]
 
