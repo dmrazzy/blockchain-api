@@ -149,14 +149,14 @@ fn get_rootstock_token_metadata(contract_address: &str) -> RootstockTokenMetadat
             name: "Rootstock Infrastructure Framework",
             symbol: "RIF",
             decimals: 18,
-            icon_url: "https://assets.coingecko.com/coins/images/7460/small/rif-token.png",
+            icon_url: "https://coin-images.coingecko.com/coins/images/7460/small/8befc44a46c247e8a3f7fc8abba586b1_%283%29.png",
         },
         "0x5db91e24bd32059584bbdb831a901f1199f3d459" => RootstockTokenMetadata {
             name: "Staked RIF",
             symbol: "stRIF",
             decimals: 18,
             // stRIF uses RIF icon as base (stRIF not yet listed on CoinGecko)
-            icon_url: "https://assets.coingecko.com/coins/images/7460/small/rif-token.png",
+            icon_url: "https://coin-images.coingecko.com/coins/images/7460/small/8befc44a46c247e8a3f7fc8abba586b1_%283%29.png",
         },
         "0x3a15461d8ae0f0fb5fa2629e9da7d66a794a6e37" => RootstockTokenMetadata {
             name: "RIF US Dollar",
