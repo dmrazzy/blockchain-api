@@ -451,19 +451,33 @@ variable "irn_nodes" {
   type        = string
 }
 
-variable "irn_key" {
-  description = "IRN client key in base64 format"
+variable "irn_client_key" {
+  description = "IRN client key"
   type        = string
+  sensitive   = true
+}
+
+variable "irn_cluster_key" {
+  description = "IRN cluster key"
+  type        = string
+  sensitive   = true
+}
+
+variable "irn_trusted_operators" {
+  description = "Comma-separated list of IRN trusted operators"
+  type        = string
+}
+
+variable "irn_encryption_secret" {
+  description = "IRN encryption secret"
+  type        = string
+  sensitive   = true
 }
 
 variable "irn_namespace" {
   description = "IRN storage namespace"
   type        = string
-}
-
-variable "irn_namespace_secret" {
-  description = "IRN storage namespace secret key"
-  type        = string
+  sensitive   = true
 }
 
 #-------------------------------------------------------------------------------

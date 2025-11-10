@@ -4,7 +4,7 @@ use {
             chain_agnostic::route::RouteSolanaError, sessions::get::InternalGetSessionContextError,
         },
         project::ProjectDataError,
-        storage::error::StorageError,
+        storage::{error::StorageError, irn},
         utils::crypto::{CaipNamespaces, CryptoUitlsError},
     },
     axum::{response::IntoResponse, Json},
@@ -215,6 +215,9 @@ pub enum RpcError {
 
     #[error("IRN client is not configured")]
     IrnNotConfigured,
+
+    #[error("IRN client configuration error: {0}")]
+    IrnConfig(#[from] irn::ConfigError),
 
     #[error("Internal permissions get context error: {0}")]
     InternalGetSessionContextError(InternalGetSessionContextError),

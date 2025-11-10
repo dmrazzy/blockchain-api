@@ -13,8 +13,8 @@ use {
     anyhow::Context,
     aws_config::meta::region::RegionProviderChain,
     aws_sdk_s3::{config::Region, Client as S3Client},
-    axum::body::Body,
     axum::{
+        body::Body,
         middleware,
         routing::{get, post},
         Router,
@@ -177,19 +177,16 @@ pub async fn bootstrap(config: Config) -> RpcResult<()> {
     sqlx::migrate!("./migrations").run(&postgres).await?;
 
     let http_client = reqwest::Client::new();
-    let irn_client =
-        if let (Some(nodes), Some(key_base64), Some(namespace), Some(namespace_secret)) = (
-            config.irn.nodes.clone(),
-            config.irn.key.clone(),
-            config.irn.namespace.clone(),
-            config.irn.namespace_secret.clone(),
-        ) {
-            Some(irn::Irn::new(key_base64, nodes, namespace, namespace_secret).await?)
-        } else {
-            warn!("IRN client is disabled (missing required environment configuration variables)");
-            None
-        };
-
+    let irn_client = if config.irn.client_key.is_some()
+        && config.irn.nodes.is_some()
+        && config.irn.trusted_operators.is_some()
+        && config.irn.encryption_secret.is_some()
+    {
+        Some(irn::Irn::new(config.irn.parse()?).await?)
+    } else {
+        warn!("WCN client is disabled (missing required environment configuration variables)");
+        None
+    };
     let state = state::new_state(
         config.clone(),
         postgres.clone(),
@@ -223,7 +220,8 @@ pub async fn bootstrap(config: Config) -> RpcResult<()> {
         HeaderName::from_static("x-sdk-version"),
     ]);
 
-    // No static restricted CORS here; dynamic CORS for /v1/json-rpc is handled in its handler
+    // No static restricted CORS here; dynamic CORS for /v1/json-rpc is handled in
+    // its handler
 
     let tracing_layer = ServiceBuilder::new()
         .set_x_request_id(MakeRequestUuid)
@@ -593,7 +591,10 @@ fn init_providers(config: &ProvidersConfig) -> ProviderRepository {
                     e
                 );
             })
-            .expect("Failed to create redis pool builder for provider's responses caching, builder is None");
+            .expect(
+                "Failed to create redis pool builder for provider's responses caching, builder is \
+                 None",
+            );
         redis_pool = Some(Arc::new(
             redis_builder
                 .runtime(deadpool_redis::Runtime::Tokio1)

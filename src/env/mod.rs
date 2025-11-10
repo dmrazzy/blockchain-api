@@ -248,9 +248,14 @@ mod test {
             ),
             // IRN config.
             ("RPC_PROXY_IRN_NODES", "node1.id,node2.id"),
-            ("RPC_PROXY_IRN_KEY", "key"),
+            ("RPC_PROXY_IRN_CLIENT_KEY", "key"),
+            ("RPC_PROXY_IRN_CLUSTER_KEY", "key"),
+            (
+                "RPC_PROXY_IRN_TRUSTED_OPERATORS",
+                "operator1.id,operator2.id",
+            ),
+            ("RPC_PROXY_IRN_ENCRYPTION_SECRET", "secret"),
             ("RPC_PROXY_IRN_NAMESPACE", "namespace"),
-            ("RPC_PROXY_IRN_NAMESPACE_SECRET", "namespace"),
             // Names configuration
             ("RPC_PROXY_NAMES_ALLOWED_ZONES", "test1.id,test2.id"),
             // Account balances-related configuration
@@ -371,10 +376,15 @@ mod test {
                     ip_whitelist: Some(vec!["127.0.0.1".into(), "127.0.0.2".into()]),
                 },
                 irn: IrnConfig {
+                    client_key: Some("key".to_owned()),
+                    cluster_key: Some("key".to_owned()),
+                    trusted_operators: Some(vec![
+                        "operator1.id".to_owned(),
+                        "operator2.id".to_owned()
+                    ]),
+                    encryption_secret: Some("secret".to_owned()),
                     nodes: Some(vec!["node1.id".to_owned(), "node2.id".to_owned()]),
-                    key: Some("key".to_owned()),
                     namespace: Some("namespace".to_owned()),
-                    namespace_secret: Some("namespace".to_owned()),
                 },
                 names: NamesConfig {
                     allowed_zones: Some(vec!["test1.id".to_owned(), "test2.id".to_owned()]),

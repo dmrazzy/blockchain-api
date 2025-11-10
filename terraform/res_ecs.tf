@@ -101,10 +101,12 @@ module "ecs" {
   rate_limiting_ip_whitelist    = var.rate_limiting_ip_whitelist
 
   # IRN Client
-  irn_nodes            = var.irn_nodes
-  irn_key              = var.irn_key
-  irn_namespace        = var.irn_namespace
-  irn_namespace_secret = var.irn_namespace_secret
+  irn_nodes             = var.irn_nodes
+  irn_client_key        = var.irn_client_key
+  irn_cluster_key       = var.irn_cluster_key
+  irn_trusted_operators = var.irn_trusted_operators
+  irn_namespace         = var.irn_namespace
+  irn_encryption_secret = var.irn_encryption_secret
 
   # ENS Names
   names_allowed_zones = var.names_allowed_zones

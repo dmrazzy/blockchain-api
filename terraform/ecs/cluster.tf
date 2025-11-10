@@ -142,9 +142,11 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "RPC_PROXY_POSTGRES_URI", value = var.postgres_url },
 
         { name = "RPC_PROXY_IRN_NODES", value = var.irn_nodes },
-        { name = "RPC_PROXY_IRN_KEY", value = var.irn_key },
+        { name = "RPC_PROXY_IRN_CLIENT_KEY", value = var.irn_client_key },
+        { name = "RPC_PROXY_IRN_CLUSTER_KEY", value = var.irn_cluster_key },
+        { name = "RPC_PROXY_IRN_TRUSTED_OPERATORS", value = var.irn_trusted_operators },
         { name = "RPC_PROXY_IRN_NAMESPACE", value = var.irn_namespace },
-        { name = "RPC_PROXY_IRN_NAMESPACE_SECRET", value = var.irn_namespace_secret },
+        { name = "RPC_PROXY_IRN_ENCRYPTION_SECRET", value = var.irn_encryption_secret },
 
         { name = "RPC_PROXY_NAMES_ALLOWED_ZONES", value = var.names_allowed_zones },
         { name = "RPC_PROXY_BALANCES_DENYLIST_PROJECT_IDS", value = var.balances_denylist_project_ids },
